@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0F0F0F;
+    color: #F5F5F5;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0F0F0F;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2A2A2E;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #F59E0B;
+  }
+}
+
+@layer components {
+  .section-title {
+    @apply font-mono text-3xl md:text-4xl font-bold tracking-widest uppercase text-text-primary;
+  }
+
+  .section-title-amber {
+    @apply border-b-2 border-accent-amber pb-1 inline-block;
+  }
+
+  .card-base {
+    @apply bg-bg-secondary border border-border rounded-lg p-6 transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:-translate-y-1 hover:border-accent-amber hover:shadow-[0_0_20px_rgba(245,158,11,0.15)];
+  }
+
+  .btn-amber {
+    @apply bg-accent-amber text-bg-primary font-mono font-bold px-6 py-3 rounded-lg
+           transition-all duration-300 hover:shadow-[0_0_20px_rgba(245,158,11,0.5)]
+           hover:brightness-110 active:scale-95 cursor-pointer;
+  }
+
+  .btn-outline {
+    @apply border border-accent-amber text-accent-amber font-mono font-bold px-6 py-3 rounded-lg
+           transition-all duration-300 hover:bg-accent-amber hover:text-bg-primary
+           active:scale-95 cursor-pointer;
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(245,158,11,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,158,11,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 20px rgba(245,158,11,0.3);
+  }
+
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(59,130,246,0.3);
+  }
+
+  .layer-line-divider {
+    background: repeating-linear-gradient(
+      90deg,
+      #2A2A2E 0px,
+      #2A2A2E 4px,
+      transparent 4px,
+      transparent 12px
+    );
+    height: 1px;
+  }
+
+  .input-field {
+    @apply w-full bg-bg-tertiary border border-border rounded-lg px-4 py-3
+           text-text-primary placeholder-text-muted font-sans
+           focus:outline-none focus:border-accent-amber focus:ring-1 focus:ring-accent-amber
+           transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  .text-gradient-amber {
+    background: linear-gradient(135deg, #F59E0B, #FCD34D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-radial-amber {
+    background: radial-gradient(ellipse at center, rgba(245,158,11,0.08) 0%, transparent 70%);
+  }
+}
+
+/* Printer animation */
+@keyframes nozzlePulse {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px #F59E0B); }
+  50% { opacity: 0.7; filter: drop-shadow(0 0 12px #F59E0B); }
+}
+
+@keyframes layerRise {
+  0% { transform: scaleY(0); opacity: 0; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes printHead {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(60px); }
+  75% { transform: translateX(-60px); }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-nozzle { animation: nozzlePulse 2s ease-in-out infinite; }
+.animate-print-head { animation: printHead 3s ease-in-out infinite; }
+.animate-fade-slide-up { animation: fadeSlideUp 0.6s ease forwards; }
+.animate-fade-in { animation: fadeIn 0.4s ease forwards; }
+.animate-count-up { animation: countUp 0.5s ease forwards; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}

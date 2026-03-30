@@ -1,0 +1,345 @@
+import { useState } from 'react'
+import {
+  Bell, ShoppingCart, Car, MessageSquare, Trash2,
+  CheckCheck, ChevronDown, ChevronUp,
+  Package, Mail, Phone, MapPin, Clock, Building2, FileText
+} from 'lucide-react'
+import {
+  useNotificationsStore,
+  type Notification,
+  type OrderNotification,
+  type PartRequestNotification,
+  type ContactNotification,
+  type NotificationType,
+} from '@/stores/notificationsStore'
+
+type FilterType = 'all' | NotificationType
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function TypeBadge({ type }: { type: NotificationType }) {
+  const config = {
+    order: { label: 'Order', icon: ShoppingCart, color: 'text-accent-green bg-accent-green/10 border-accent-green/20' },
+    part_request: { label: 'Part Request', icon: Car, color: 'text-accent-blue bg-accent-blue/10 border-accent-blue/20' },
+    contact: { label: 'Message', icon: MessageSquare, color: 'text-accent-amber bg-accent-amber/10 border-accent-amber/20' },
+  }
+  const { label, icon: Icon, color } = config[type]
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono border ${color}`}>
+      <Icon size={12} /> {label}
+    </span>
+  )
+}
+
+function OrderDetail({ n }: { n: OrderNotification }) {
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <h4 className="font-mono text-xs text-text-muted uppercase tracking-wider">Customer</h4>
+          <div className="space-y-1.5 text-sm">
+            <p className="text-text-primary flex items-center gap-2"><Package size={14} className="text-accent-amber" /> {n.customer.name}</p>
+            <p className="text-text-secondary flex items-center gap-2"><Mail size={14} className="text-text-muted" /> {n.customer.email}</p>
+            <p className="text-text-secondary flex items-center gap-2"><Phone size={14} className="text-text-muted" /> {n.customer.phone}</p>
+            {n.customer.deliveryType === 'delivery' && n.customer.address && (
+              <p className="text-text-secondary flex items-center gap-2"><MapPin size={14} className="text-text-muted" /> {n.customer.address}, {n.customer.city} {n.customer.postalCode}</p>
+            )}
+            <p className="text-text-secondary flex items-center gap-2">
+              <Package size={14} className="text-text-muted" />
+              {n.customer.deliveryType === 'pickup' ? 'Pickup' : 'Delivery'}
+            </p>
+          </div>
+        </div>
+        <div>
+          <h4 className="font-mono text-xs text-text-muted uppercase tracking-wider mb-2">Items</h4>
+          <div className="space-y-1.5">
+            {n.items.map((item, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-text-secondary">{item.name} × {item.quantity}</span>
+                <span className="font-accent text-text-primary">€{(item.price * item.quantity).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-border mt-3 pt-3 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-text-muted">Subtotal</span>
+              <span className="text-text-primary">€{n.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-text-muted">Delivery</span>
+              <span className={n.deliveryFee === 0 ? 'text-accent-green' : 'text-text-primary'}>
+                {n.deliveryFee === 0 ? 'Free' : `€${n.deliveryFee.toFixed(2)}`}
+              </span>
+            </div>
+            <div className="flex justify-between text-base font-bold border-t border-border pt-2 mt-2">
+              <span className="font-mono text-text-primary">Total</span>
+              <span className="font-mono text-accent-amber">€{n.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PartRequestDetail({ n }: { n: PartRequestNotification }) {
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-mono text-xs text-text-muted">Ref:</span>
+        <span className="font-mono text-sm text-accent-amber">{n.reference}</span>
+        <span className="text-text-muted text-xs">• {n.images} photos</span>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <h4 className="font-mono text-xs text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Car size={12} /> Vehicle & Part
+          </h4>
+          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-sm">
+            <span className="text-text-muted">Vehicle:</span>
+            <span className="text-text-primary">{n.details.vehicleMake} {n.details.vehicleModel} {n.details.vehicleYear}</span>
+            <span className="text-text-muted">Part:</span>
+            <span className="text-text-primary">{n.details.partName}</span>
+            <span className="text-text-muted">Material:</span>
+            <span className="text-text-primary">{n.details.material}</span>
+            <span className="text-text-muted">Qty:</span>
+            <span className="text-text-primary">{n.details.quantity}</span>
+            <span className="text-text-muted">Finish:</span>
+            <span className="text-text-primary capitalize">{n.details.finish}</span>
+            <span className="text-text-muted">Urgency:</span>
+            <span className={`capitalize ${n.details.urgency === 'rush' ? 'text-red-400 font-bold' : n.details.urgency === 'priority' ? 'text-accent-amber' : 'text-text-primary'}`}>{n.details.urgency}</span>
+            {n.details.dimensions && (
+              <>
+                <span className="text-text-muted">Dimensions:</span>
+                <span className="text-text-primary">{n.details.dimensions}</span>
+              </>
+            )}
+          </div>
+          {n.details.partDescription && (
+            <p className="text-text-secondary text-xs mt-3 border-t border-border pt-2">{n.details.partDescription}</p>
+          )}
+        </div>
+        <div>
+          <h4 className="font-mono text-xs text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Building2 size={12} /> Business Contact
+          </h4>
+          <div className="space-y-1.5 text-sm">
+            {n.business.companyName && <p className="text-text-primary font-accent">{n.business.companyName}</p>}
+            {n.business.vatNumber && <p className="text-text-muted text-xs">VAT: {n.business.vatNumber}</p>}
+            <p className="text-text-secondary flex items-center gap-2"><Package size={12} className="text-text-muted" /> {n.business.contactName}</p>
+            <p className="text-text-secondary flex items-center gap-2"><Mail size={12} className="text-text-muted" /> {n.business.contactEmail}</p>
+            {n.business.contactPhone && <p className="text-text-secondary flex items-center gap-2"><Phone size={12} className="text-text-muted" /> {n.business.contactPhone}</p>}
+            {n.business.notes && <p className="text-text-muted text-xs border-t border-border pt-2 mt-2">{n.business.notes}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContactDetail({ n }: { n: ContactNotification }) {
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="space-y-2 text-sm">
+        <p className="text-text-primary flex items-center gap-2"><Package size={14} className="text-accent-amber" /> {n.name}</p>
+        <p className="text-text-secondary flex items-center gap-2"><Mail size={14} className="text-text-muted" /> {n.email}</p>
+        {n.service && (
+          <p className="text-text-secondary flex items-center gap-2"><FileText size={14} className="text-text-muted" /> Service: {n.service}</p>
+        )}
+      </div>
+      <div className="bg-bg-tertiary rounded-lg p-4">
+        <p className="font-mono text-xs text-text-muted uppercase mb-2">Message</p>
+        <p className="text-text-primary text-sm whitespace-pre-wrap">{n.message}</p>
+      </div>
+    </div>
+  )
+}
+
+function NotificationCard({ notification, onDelete }: { notification: Notification; onDelete: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const markRead = useNotificationsStore((s) => s.markRead)
+
+  const handleExpand = () => {
+    if (!expanded && !notification.read) {
+      markRead(notification.id)
+    }
+    setExpanded(!expanded)
+  }
+
+  const title = notification.type === 'order'
+    ? `New Order — €${(notification as OrderNotification).total.toFixed(2)}`
+    : notification.type === 'part_request'
+    ? `Part Request — ${(notification as PartRequestNotification).details.partName}`
+    : `Message from ${(notification as ContactNotification).name}`
+
+  return (
+    <div className={`card-base transition-all ${!notification.read ? 'border-accent-amber/30 bg-accent-amber/[0.02]' : ''}`}>
+      <div
+        className="flex items-center gap-3 p-4 cursor-pointer hover:bg-bg-tertiary/50 transition-colors rounded-lg"
+        onClick={handleExpand}
+      >
+        {!notification.read && (
+          <div className="w-2.5 h-2.5 rounded-full bg-accent-amber shrink-0 animate-pulse" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <TypeBadge type={notification.type} />
+            <span className="text-text-muted text-xs flex items-center gap-1">
+              <Clock size={10} /> {timeAgo(notification.date)}
+            </span>
+          </div>
+          <p className="font-mono text-sm text-text-primary truncate">{title}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="p-1.5 rounded hover:bg-red-500/10 text-text-muted hover:text-red-400 transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
+          {expanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-border mx-4">
+          <p className="text-text-muted text-xs mt-3">{formatDate(notification.date)}</p>
+          {notification.type === 'order' && <OrderDetail n={notification as OrderNotification} />}
+          {notification.type === 'part_request' && <PartRequestDetail n={notification as PartRequestNotification} />}
+          {notification.type === 'contact' && <ContactDetail n={notification as ContactNotification} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function AdminNotifications() {
+  const { notifications, markAllRead, deleteNotification, clearAll, getUnreadCount } = useNotificationsStore()
+  const [filter, setFilter] = useState<FilterType>('all')
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  const unread = getUnreadCount()
+  const filtered = filter === 'all' ? notifications : notifications.filter((n) => n.type === filter)
+
+  const counts = {
+    all: notifications.length,
+    order: notifications.filter((n) => n.type === 'order').length,
+    part_request: notifications.filter((n) => n.type === 'part_request').length,
+    contact: notifications.filter((n) => n.type === 'contact').length,
+  }
+
+  const handleClear = () => {
+    if (confirmClear) {
+      clearAll()
+      setConfirmClear(false)
+    } else {
+      setConfirmClear(true)
+      setTimeout(() => setConfirmClear(false), 3000)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <h1 className="font-mono text-2xl font-bold text-text-primary">Notifications</h1>
+          {unread > 0 && (
+            <span className="bg-accent-amber text-bg-primary text-xs font-bold font-mono px-2.5 py-1 rounded-full">
+              {unread} new
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {unread > 0 && (
+            <button
+              onClick={markAllRead}
+              className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber transition-colors px-3 py-1.5 rounded-lg hover:bg-bg-tertiary"
+            >
+              <CheckCheck size={14} /> Mark all read
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              onClick={handleClear}
+              className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg transition-all ${
+                confirmClear
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                  : 'text-text-muted hover:text-red-400 hover:bg-bg-tertiary'
+              }`}
+            >
+              <Trash2 size={14} /> {confirmClear ? 'Click to confirm' : 'Clear all'}
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="text-text-secondary text-sm mb-6">Orders, custom part requests, and contact form messages.</p>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {([
+          { key: 'all' as FilterType, label: 'All', icon: Bell },
+          { key: 'order' as FilterType, label: 'Orders', icon: ShoppingCart },
+          { key: 'part_request' as FilterType, label: 'Part Requests', icon: Car },
+          { key: 'contact' as FilterType, label: 'Messages', icon: MessageSquare },
+        ]).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-mono text-xs transition-all whitespace-nowrap ${
+              filter === key
+                ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/30'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-transparent'
+            }`}
+          >
+            <Icon size={14} />
+            {label}
+            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+              filter === key ? 'bg-accent-amber/20' : 'bg-bg-tertiary'
+            }`}>
+              {counts[key]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Notifications list */}
+      <div className="space-y-3">
+        {filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <Bell size={48} className="mx-auto text-text-muted/20 mb-4" />
+            <p className="font-mono text-text-secondary mb-1">No notifications yet</p>
+            <p className="text-text-muted text-sm">
+              Orders, part requests, and contact messages will appear here.
+            </p>
+          </div>
+        ) : (
+          filtered.map((n) => (
+            <NotificationCard
+              key={n.id}
+              notification={n}
+              onDelete={() => deleteNotification(n.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
