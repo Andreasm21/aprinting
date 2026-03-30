@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/notifications', label: 'Notifications', icon: Bell },
+  { path: '/admin/customers', label: 'Customers', icon: Users },
   { path: '/admin/products', label: 'Products', icon: Package },
   { path: '/admin/hero', label: 'Hero Section', icon: FileText },
   { path: '/admin/services', label: 'Services', icon: FileText },

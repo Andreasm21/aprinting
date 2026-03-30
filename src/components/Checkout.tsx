@@ -4,6 +4,7 @@ import { useCartStore } from '@/stores/cartStore'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useNotificationsStore } from '@/stores/notificationsStore'
+import { useCustomersStore } from '@/stores/customersStore'
 import type { CustomerInfo } from '@/types'
 
 export default function Checkout() {
@@ -34,8 +35,13 @@ export default function Checkout() {
     (info.deliveryType === 'pickup' || (info.address && info.city && info.postalCode))
 
   const addOrder = useNotificationsStore((s) => s.addOrder)
+  const recordOrder = useCustomersStore((s) => s.recordOrder)
 
   const handlePlaceOrder = () => {
+    recordOrder(
+      info.email, info.name, info.phone, total,
+      info.address || undefined, info.city || undefined, info.postalCode || undefined
+    )
     addOrder({
       customer: {
         name: info.name,

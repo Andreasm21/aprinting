@@ -1,15 +1,18 @@
 import { Link } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, Bell } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, Bell, Users } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
+import { useCustomersStore } from '@/stores/customersStore'
 
 export default function AdminDashboard() {
   const products = useContentStore((s) => s.products)
   const { notifications, getUnreadCount } = useNotificationsStore()
+  const customerCount = useCustomersStore((s) => s.customers.length)
   const unread = getUnreadCount()
 
   const cards = [
     { label: 'Notifications', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
+    { label: 'Customers', count: customerCount, icon: Users, path: '/admin/customers', color: 'blue' },
     { label: 'Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },
     { label: 'Hero Section', icon: FileText, path: '/admin/hero', color: 'blue' },
     { label: 'Services', icon: FileText, path: '/admin/services', color: 'amber' },
