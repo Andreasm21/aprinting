@@ -34,7 +34,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1 className="font-mono text-2xl font-bold text-text-primary mb-2">Dashboard</h1>
-      <p className="text-text-secondary text-sm mb-8">Manage your APrinting website content.</p>
+      <p className="text-text-secondary text-sm mb-8">Manage your Axiom website content.</p>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((card) => (

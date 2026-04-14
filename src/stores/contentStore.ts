@@ -85,7 +85,7 @@ const defaultContent: SiteContent = {
   },
   contact: {
     whatsappNumber: '+357 99 000 000',
-    email: 'hello@aprinting.cy',
+    email: 'hello@axiom3d.cy',
     location: 'Cyprus 🇨🇾',
     hours: 'Mon – Sat: 9:00 – 19:00',
   },

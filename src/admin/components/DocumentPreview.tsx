@@ -38,7 +38,7 @@ export default function DocumentPreview({ doc, onClose }: Props) {
             <div>
               <div className="flex items-baseline gap-0">
                 <span className="text-2xl font-bold" style={{ color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>A</span>
-                <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Printing</span>
+                <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>xiom</span>
               </div>
               <p className="text-xs text-gray-500 mt-1">Professional 3D Printing Services</p>
               <p className="text-xs text-gray-500">{contact.location}</p>
@@ -149,7 +149,7 @@ export default function DocumentPreview({ doc, onClose }: Props) {
 
           {/* Footer */}
           <div className="pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400">
-            <p>APrinting — Professional 3D Printing Services · Cyprus</p>
+            <p>Axiom — Professional 3D Printing Services · Cyprus</p>
             <p>{contact.email} · {contact.whatsappNumber}</p>
           </div>
         </div>

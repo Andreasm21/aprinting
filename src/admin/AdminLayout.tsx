@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-5 border-b border-border">
           <div className="flex items-baseline gap-0">
             <span className="font-mono text-lg font-bold text-accent-amber">A</span>
-            <span className="font-mono text-lg font-bold text-text-primary">Printing</span>
+            <span className="font-mono text-lg font-bold text-text-primary">xiom</span>
           </div>
           <p className="text-text-muted text-xs font-mono mt-1">Admin Panel</p>
         </div>

@@ -10,7 +10,7 @@ export const translations = {
     },
     hero: {
       headline: 'A',
-      headlineAccent: 'Printing',
+      headlineAccent: 'xiom',
       tagline: 'From Digital to Physical',
       subtitle: 'Professional FDM & Resin 3D printing in Cyprus. Custom prints, prototypes, and ready-made products — delivered to your door.',
       ctaPrimary: 'Order a Custom Print',
@@ -143,7 +143,7 @@ export const translations = {
       send: 'Send Message',
       whatsapp: 'Chat on WhatsApp',
       emailLabel: 'Email',
-      emailValue: 'hello@aprinting.cy',
+      emailValue: 'hello@axiom3d.cy',
       location: 'Location',
       locationValue: 'Cyprus 🇨🇾',
       hours: 'Business Hours',
@@ -152,7 +152,7 @@ export const translations = {
     },
     footer: {
       tagline: 'From Digital to Physical',
-      rights: '© 2026 APrinting. All rights reserved.',
+      rights: '© 2026 Axiom. All rights reserved.',
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',
       madeIn: 'Made in Cyprus 🇨🇾',
@@ -204,7 +204,7 @@ export const translations = {
     },
     hero: {
       headline: 'A',
-      headlineAccent: 'Printing',
+      headlineAccent: 'xiom',
       tagline: 'Από το Ψηφιακό στο Φυσικό',
       subtitle: 'Επαγγελματική 3D εκτύπωση FDM & Resin στην Κύπρο. Εξατομικευμένες εκτυπώσεις, πρωτότυπα και έτοιμα προϊόντα — παράδοση στην πόρτα σας.',
       ctaPrimary: 'Παραγγείλτε Εκτύπωση',
@@ -337,7 +337,7 @@ export const translations = {
       send: 'Αποστολή',
       whatsapp: 'Chat στο WhatsApp',
       emailLabel: 'Email',
-      emailValue: 'hello@aprinting.cy',
+      emailValue: 'hello@axiom3d.cy',
       location: 'Τοποθεσία',
       locationValue: 'Κύπρος 🇨🇾',
       hours: 'Ωράριο',
@@ -346,7 +346,7 @@ export const translations = {
     },
     footer: {
       tagline: 'Από το Ψηφιακό στο Φυσικό',
-      rights: '© 2026 APrinting. Όλα τα δικαιώματα κατοχυρωμένα.',
+      rights: '© 2026 Axiom. Όλα τα δικαιώματα κατοχυρωμένα.',
       privacy: 'Πολιτική Απορρήτου',
       terms: 'Όροι Χρήσης',
       madeIn: 'Κατασκευή στην Κύπρο 🇨🇾',

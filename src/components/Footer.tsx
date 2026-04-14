@@ -25,7 +25,7 @@ export default function Footer() {
           <div>
             <div className="flex items-baseline gap-0 mb-2">
               <span className="font-mono text-xl font-bold text-accent-amber">A</span>
-              <span className="font-mono text-xl font-bold text-text-primary">Printing</span>
+              <span className="font-mono text-xl font-bold text-text-primary">xiom</span>
             </div>
             <p className="text-text-secondary text-sm">{t.footer.tagline}</p>
           </div>

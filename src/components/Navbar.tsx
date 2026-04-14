@@ -50,7 +50,7 @@ export default function Navbar() {
                 A
               </span>
               <span className="font-mono text-xl md:text-2xl font-bold text-text-primary tracking-tight">
-                Printing
+                xiom
               </span>
             </a>
 

@@ -127,7 +127,7 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => ({
   },
 
   getNextNumber: (type) => {
-    const prefix = type === 'invoice' ? 'APR' : 'QT'
+    const prefix = type === 'invoice' ? 'AXM' : 'QT'
     const year = new Date().getFullYear()
     const existing = get().invoices.filter((inv) => inv.type === type && inv.documentNumber.includes(`${year}`))
     const maxNum = existing.reduce((max, inv) => {

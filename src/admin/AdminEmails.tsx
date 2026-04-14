@@ -23,7 +23,7 @@ interface TemplateVars {
 const defaultVars: TemplateVars = {
   name: 'John Doe',
   email: 'john@example.com',
-  orderNumber: 'APR-2026-0001',
+  orderNumber: 'AXM-2026-0001',
   total: '€45.00',
   items: '1× Phone Stand (€8.00)\n1× Cable Organizer (€12.00)\n1× Desk Organizer (€25.00)',
   deliveryType: 'Delivery',
@@ -52,10 +52,10 @@ function fillTemplate(template: string, vars: TemplateVars): string {
 const templates: Record<TemplateName, Record<Lang, { subject: string; body: string }>> = {
   welcome: {
     en: {
-      subject: 'Welcome to APrinting! 🎉',
+      subject: 'Welcome to Axiom! 🎉',
       body: `Hi {{name}},
 
-Welcome to APrinting! We're thrilled to have you on board.
+Welcome to Axiom! We're thrilled to have you on board.
 
 Your account has been created successfully. Here's what you can look forward to:
 
@@ -67,18 +67,18 @@ Your account has been created successfully. Here's what you can look forward to:
 If you have any questions or want to discuss a project, don't hesitate to reach out. We're here to bring your ideas to life!
 
 Best regards,
-The APrinting Team
+The Axiom Team
 Cyprus 🇨🇾
 
 ---
-APrinting — From Digital to Physical
-hello@aprinting.cy`,
+Axiom — From Digital to Physical
+hello@axiom3d.cy`,
     },
     gr: {
-      subject: 'Καλώς ήρθατε στην APrinting! 🎉',
+      subject: 'Καλώς ήρθατε στην Axiom! 🎉',
       body: `Γεια σας {{name}},
 
-Καλώς ήρθατε στην APrinting! Είμαστε ενθουσιασμένοι που σας έχουμε μαζί μας.
+Καλώς ήρθατε στην Axiom! Είμαστε ενθουσιασμένοι που σας έχουμε μαζί μας.
 
 Ο λογαριασμός σας δημιουργήθηκε επιτυχώς. Δείτε τι μπορείτε να περιμένετε:
 
@@ -90,12 +90,12 @@ hello@aprinting.cy`,
 Αν έχετε οποιαδήποτε ερώτηση ή θέλετε να συζητήσετε ένα έργο, μη διστάσετε να επικοινωνήσετε. Είμαστε εδώ για να ζωντανέψουμε τις ιδέες σας!
 
 Με εκτίμηση,
-Η ομάδα APrinting
+Η ομάδα Axiom
 Κύπρος 🇨🇾
 
 ---
-APrinting — Από το Ψηφιακό στο Φυσικό
-hello@aprinting.cy`,
+Axiom — Από το Ψηφιακό στο Φυσικό
+hello@axiom3d.cy`,
     },
   },
   order_confirmed: {
@@ -121,14 +121,14 @@ Estimated timeline: 3-5 business days for standard orders.
 
 If you have any questions about your order, just reply to this email or reach us on WhatsApp.
 
-Thank you for choosing APrinting!
+Thank you for choosing Axiom!
 
 Best regards,
-The APrinting Team
+The Axiom Team
 
 ---
-APrinting — From Digital to Physical
-hello@aprinting.cy`,
+Axiom — From Digital to Physical
+hello@axiom3d.cy`,
     },
     gr: {
       subject: 'Επιβεβαίωση Παραγγελίας — {{orderNumber}}',
@@ -152,14 +152,14 @@ hello@aprinting.cy`,
 
 Αν έχετε ερωτήσεις για την παραγγελία σας, απαντήστε σε αυτό το email ή επικοινωνήστε μαζί μας στο WhatsApp.
 
-Ευχαριστούμε που επιλέξατε την APrinting!
+Ευχαριστούμε που επιλέξατε την Axiom!
 
 Με εκτίμηση,
-Η ομάδα APrinting
+Η ομάδα Axiom
 
 ---
-APrinting — Από το Ψηφιακό στο Φυσικό
-hello@aprinting.cy`,
+Axiom — Από το Ψηφιακό στο Φυσικό
+hello@axiom3d.cy`,
     },
   },
   order_ready: {
@@ -181,14 +181,14 @@ If you chose delivery, your order will be shipped today and should arrive within
 
 We hope you love your prints! If there's anything that doesn't meet your expectations, please let us know within 48 hours.
 
-Thank you for choosing APrinting!
+Thank you for choosing Axiom!
 
 Best regards,
-The APrinting Team
+The Axiom Team
 
 ---
-APrinting — From Digital to Physical
-hello@aprinting.cy`,
+Axiom — From Digital to Physical
+hello@axiom3d.cy`,
     },
     gr: {
       subject: 'Η Παραγγελία σας είναι Έτοιμη! — {{orderNumber}}',
@@ -208,14 +208,14 @@ hello@aprinting.cy`,
 
 Ελπίζουμε να σας αρέσουν οι εκτυπώσεις σας! Αν κάτι δεν ανταποκρίνεται στις προσδοκίες σας, ενημερώστε μας εντός 48 ωρών.
 
-Ευχαριστούμε που επιλέξατε την APrinting!
+Ευχαριστούμε που επιλέξατε την Axiom!
 
 Με εκτίμηση,
-Η ομάδα APrinting
+Η ομάδα Axiom
 
 ---
-APrinting — Από το Ψηφιακό στο Φυσικό
-hello@aprinting.cy`,
+Axiom — Από το Ψηφιακό στο Φυσικό
+hello@axiom3d.cy`,
     },
   },
   shipped: {
@@ -236,14 +236,14 @@ You can track your package using the tracking number above.
 • If you're not home, the courier may leave it with a neighbor or attempt redelivery
 • Contact us immediately if there are any issues with your delivery
 
-Thank you for shopping with APrinting!
+Thank you for shopping with Axiom!
 
 Best regards,
-The APrinting Team
+The Axiom Team
 
 ---
-APrinting — From Digital to Physical
-hello@aprinting.cy`,
+Axiom — From Digital to Physical
+hello@axiom3d.cy`,
     },
     gr: {
       subject: 'Η Παραγγελία σας Απεστάλη! — {{orderNumber}}',
@@ -262,14 +262,14 @@ hello@aprinting.cy`,
 • Αν δεν είστε σπίτι, ο κούριερ μπορεί να το αφήσει σε γείτονα ή να επιχειρήσει εκ νέου παράδοση
 • Επικοινωνήστε μαζί μας αμέσως αν υπάρχει οποιοδήποτε πρόβλημα
 
-Ευχαριστούμε που αγοράσατε από την APrinting!
+Ευχαριστούμε που αγοράσατε από την Axiom!
 
 Με εκτίμηση,
-Η ομάδα APrinting
+Η ομάδα Axiom
 
 ---
-APrinting — Από το Ψηφιακό στο Φυσικό
-hello@aprinting.cy`,
+Axiom — Από το Ψηφιακό στο Φυσικό
+hello@axiom3d.cy`,
     },
   },
   quote_ready: {
@@ -297,11 +297,11 @@ For bulk orders or recurring parts, we offer volume discounts. Let's discuss!
 If you have any questions or want to modify the specifications, don't hesitate to reach out.
 
 Best regards,
-The APrinting Team
+The Axiom Team
 
 ---
-APrinting — From Digital to Physical
-hello@aprinting.cy`,
+Axiom — From Digital to Physical
+hello@axiom3d.cy`,
     },
     gr: {
       subject: 'Η Προσφορά σας είναι Έτοιμη — {{quoteRef}}',
@@ -327,11 +327,11 @@ hello@aprinting.cy`,
 Αν έχετε ερωτήσεις ή θέλετε να τροποποιήσετε τις προδιαγραφές, μη διστάσετε να επικοινωνήσετε.
 
 Με εκτίμηση,
-Η ομάδα APrinting
+Η ομάδα Axiom
 
 ---
-APrinting — Από το Ψηφιακό στο Φυσικό
-hello@aprinting.cy`,
+Axiom — Από το Ψηφιακό στο Φυσικό
+hello@axiom3d.cy`,
     },
   },
 }
@@ -375,7 +375,7 @@ export default function AdminEmails() {
       ...vars,
       name: order.customer.name,
       email: order.customer.email,
-      orderNumber: order.id.replace('ord-', 'APR-').slice(0, 14).toUpperCase(),
+      orderNumber: order.id.replace('ord-', 'AXM-').slice(0, 14).toUpperCase(),
       total: `€${order.total.toFixed(2)}`,
       items: order.items.map((i) => `${i.quantity}× ${i.name} (€${(i.price * i.quantity).toFixed(2)})`).join('\n'),
       deliveryType: order.customer.deliveryType === 'pickup' ? 'Pickup' : 'Delivery',
