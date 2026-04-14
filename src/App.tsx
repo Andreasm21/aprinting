@@ -25,6 +25,10 @@ const AdminAbout = lazy(() => import('@/admin/AdminAbout'))
 const AdminContact = lazy(() => import('@/admin/AdminContact'))
 const AdminNotifications = lazy(() => import('@/admin/AdminNotifications'))
 const AdminCustomers = lazy(() => import('@/admin/AdminCustomers'))
+const AdminInvoices = lazy(() => import('@/admin/AdminInvoices'))
+const AdminQuotations = lazy(() => import('@/admin/AdminQuotations'))
+const AdminEmails = lazy(() => import('@/admin/AdminEmails'))
+const AdminPotion = lazy(() => import('@/admin/AdminPotion'))
 
 function AdminLoader({ children }: { children: React.ReactNode }) {
   return (
@@ -69,6 +73,10 @@ function App() {
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
+        <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
+        <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
+        <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />
+        <Route path="/admin/potion" element={<AdminLoader><AdminPotion /></AdminLoader>} />
         <Route path="/admin/products" element={<AdminLoader><AdminProducts /></AdminLoader>} />
         <Route path="/admin/hero" element={<AdminLoader><AdminHero /></AdminLoader>} />
         <Route path="/admin/services" element={<AdminLoader><AdminServices /></AdminLoader>} />

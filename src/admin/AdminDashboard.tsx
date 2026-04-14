@@ -1,18 +1,28 @@
 import { Link } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, Bell, Users } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BookOpen } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
+import { useInvoicesStore } from '@/stores/invoicesStore'
+import { usePotionStore } from '@/stores/potionStore'
 
 export default function AdminDashboard() {
   const products = useContentStore((s) => s.products)
   const { notifications, getUnreadCount } = useNotificationsStore()
   const customerCount = useCustomersStore((s) => s.customers.length)
+  const allInvoices = useInvoicesStore((s) => s.invoices)
+  const invoiceCount = allInvoices.filter((i) => i.type === 'invoice').length
+  const quotationCount = allInvoices.filter((i) => i.type === 'quotation').length
+  const potionPageCount = Object.keys(usePotionStore.getState().pages).length
   const unread = getUnreadCount()
 
   const cards = [
     { label: 'Notifications', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
     { label: 'Customers', count: customerCount, icon: Users, path: '/admin/customers', color: 'blue' },
+    { label: 'Invoices', count: invoiceCount, icon: Receipt, path: '/admin/invoices', color: 'amber' },
+    { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/quotations', color: 'blue' },
+    { label: 'Emails', icon: Mail, path: '/admin/emails', color: 'green' },
+    { label: 'Potion', count: potionPageCount, icon: BookOpen, path: '/admin/potion', color: 'amber' },
     { label: 'Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },
     { label: 'Hero Section', icon: FileText, path: '/admin/hero', color: 'blue' },
     { label: 'Services', icon: FileText, path: '/admin/services', color: 'amber' },

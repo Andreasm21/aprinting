@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import {
-  Users, Plus, Pencil, Trash2, X, Check, Search,
+  Users, Plus, Pencil, Trash2, Search,
   Mail, Phone, MapPin, Building2, FileText, ShoppingCart,
-  ChevronDown, ChevronUp, Tag
+  ChevronDown, ChevronUp, Tag, User
 } from 'lucide-react'
-import { useCustomersStore, type Customer } from '@/stores/customersStore'
+import { useCustomersStore, type Customer, type AccountType } from '@/stores/customersStore'
+import CustomerFormModal from './components/CustomerFormModal'
+
+type FilterType = 'all' | AccountType
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -14,148 +17,6 @@ function timeAgo(dateStr: string): string {
   if (days < 30) return `${days}d ago`
   if (days < 365) return `${Math.floor(days / 30)}mo ago`
   return `${Math.floor(days / 365)}y ago`
-}
-
-const TAG_PRESETS = ['VIP', 'B2B', 'Wholesale', 'Recurring', 'Car Parts', 'Prototype', 'New']
-
-function CustomerFormModal({
-  initial,
-  onSave,
-  onClose,
-  title,
-}: {
-  initial: Partial<Customer>
-  onSave: (data: Omit<Customer, 'id' | 'createdAt' | 'totalOrders' | 'totalSpent'>) => void
-  onClose: () => void
-  title: string
-}) {
-  const [form, setForm] = useState({
-    name: initial.name || '',
-    email: initial.email || '',
-    phone: initial.phone || '',
-    company: initial.company || '',
-    vatNumber: initial.vatNumber || '',
-    address: initial.address || '',
-    city: initial.city || '',
-    postalCode: initial.postalCode || '',
-    notes: initial.notes || '',
-    tags: initial.tags || [],
-  })
-
-  const toggleTag = (tag: string) => {
-    setForm((f) => ({
-      ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
-    }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave({
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      company: form.company || undefined,
-      vatNumber: form.vatNumber || undefined,
-      address: form.address || undefined,
-      city: form.city || undefined,
-      postalCode: form.postalCode || undefined,
-      notes: form.notes || undefined,
-      tags: form.tags,
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-bg-secondary border border-border rounded-lg max-w-xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-bg-secondary z-10">
-          <h2 className="font-mono text-lg font-bold text-text-primary">{title}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-bg-tertiary rounded">
-            <X size={20} className="text-text-muted" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Full Name *</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
-            </div>
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email *</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-mono text-xs text-text-muted uppercase mb-1">Phone</label>
-            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Company</label>
-              <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} className="input-field" />
-            </div>
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">VAT Number</label>
-              <input value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} className="input-field" placeholder="CY12345678X" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-mono text-xs text-text-muted uppercase mb-1">Address</label>
-            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">City</label>
-              <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-field" />
-            </div>
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Postal Code</label>
-              <input value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} className="input-field" />
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block font-mono text-xs text-text-muted uppercase mb-2">Tags</label>
-            <div className="flex flex-wrap gap-2">
-              {TAG_PRESETS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={`text-xs font-mono px-2.5 py-1 rounded-full border transition-all ${
-                    form.tags.includes(tag)
-                      ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/30'
-                      : 'border-border text-text-muted hover:border-text-secondary hover:text-text-secondary'
-                  }`}
-                >
-                  {form.tags.includes(tag) && <Check size={10} className="inline mr-1" />}
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-mono text-xs text-text-muted uppercase mb-1">Notes</label>
-            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field resize-none" rows={2} placeholder="Internal notes about this customer..." />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-border">
-            <button type="button" onClick={onClose} className="btn-outline text-sm py-2 px-4">Cancel</button>
-            <button type="submit" className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5">
-              <Check size={14} /> Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
 }
 
 function CustomerRow({ customer }: { customer: Customer }) {
@@ -181,13 +42,24 @@ function CustomerRow({ customer }: { customer: Customer }) {
       >
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent-amber/10 border border-accent-amber/20 flex items-center justify-center shrink-0">
-              <span className="font-mono text-sm font-bold text-accent-amber">
+            <div className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 ${
+              customer.accountType === 'business'
+                ? 'bg-accent-blue/10 border-accent-blue/20'
+                : 'bg-accent-amber/10 border-accent-amber/20'
+            }`}>
+              <span className={`font-mono text-sm font-bold ${
+                customer.accountType === 'business' ? 'text-accent-blue' : 'text-accent-amber'
+              }`}>
                 {customer.name.charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <p className="font-mono text-sm text-text-primary">{customer.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-sm text-text-primary">{customer.name}</p>
+                {customer.accountType === 'business' && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-blue/10 text-accent-blue border border-accent-blue/20">B2B</span>
+                )}
+              </div>
               <p className="text-text-muted text-xs">{customer.email}</p>
             </div>
           </div>
@@ -240,7 +112,6 @@ function CustomerRow({ customer }: { customer: Customer }) {
         </td>
       </tr>
 
-      {/* Expanded details row */}
       {expanded && (
         <tr className="border-b border-border/50 bg-bg-tertiary/30">
           <td colSpan={6} className="px-4 py-4">
@@ -270,6 +141,12 @@ function CustomerRow({ customer }: { customer: Customer }) {
                   {customer.vatNumber && (
                     <p className="text-text-secondary flex items-center gap-2"><FileText size={12} className="text-text-muted" /> VAT: {customer.vatNumber}</p>
                   )}
+                  {customer.paymentTerms && customer.paymentTerms !== 'immediate' && (
+                    <p className="text-text-secondary text-xs">Payment: {customer.paymentTerms.replace('net', 'Net ')}</p>
+                  )}
+                  {customer.discountTier && customer.discountTier !== 'none' && (
+                    <p className="text-accent-green text-xs font-mono capitalize">Discount: {customer.discountTier}</p>
+                  )}
                 </div>
               </div>
 
@@ -290,7 +167,6 @@ function CustomerRow({ customer }: { customer: Customer }) {
               </div>
             </div>
 
-            {/* Tags */}
             {customer.tags.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
                 <Tag size={12} className="text-text-muted" />
@@ -302,7 +178,6 @@ function CustomerRow({ customer }: { customer: Customer }) {
               </div>
             )}
 
-            {/* Notes */}
             {customer.notes && (
               <div className="mt-3 pt-3 border-t border-border/50">
                 <p className="font-mono text-[10px] text-text-muted uppercase mb-1">Notes</p>
@@ -313,23 +188,6 @@ function CustomerRow({ customer }: { customer: Customer }) {
         </tr>
       )}
 
-      {/* Edit modal */}
-      {editing && (
-        <tr className="hidden">
-          <td>
-            <CustomerFormModal
-              title="Edit Customer"
-              initial={customer}
-              onClose={() => setEditing(false)}
-              onSave={(data) => {
-                updateCustomer(customer.id, data)
-                setEditing(false)
-              }}
-            />
-          </td>
-        </tr>
-      )}
-      {/* Render modal outside table for proper z-index */}
       {editing && (
         <CustomerFormModal
           title="Edit Customer"
@@ -350,6 +208,7 @@ export default function AdminCustomers() {
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all')
 
   const allTags = [...new Set(customers.flatMap((c) => c.tags))]
 
@@ -360,11 +219,19 @@ export default function AdminCustomers() {
       (c.company && c.company.toLowerCase().includes(search.toLowerCase())) ||
       (c.phone && c.phone.includes(search))
     const matchesTag = !tagFilter || c.tags.includes(tagFilter)
-    return matchesSearch && matchesTag
+    const matchesType = typeFilter === 'all' || c.accountType === typeFilter
+    return matchesSearch && matchesTag && matchesType
   })
 
   const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0)
   const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0)
+  const b2bCount = customers.filter((c) => c.accountType === 'business').length
+
+  const typeCounts = {
+    all: customers.length,
+    individual: customers.length - b2bCount,
+    business: b2bCount,
+  }
 
   return (
     <div>
@@ -377,10 +244,14 @@ export default function AdminCustomers() {
       <p className="text-text-secondary text-sm mb-6">Manage customer accounts and track order history.</p>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="card-base p-4 text-center">
           <p className="font-mono text-2xl font-bold text-accent-amber">{customers.length}</p>
           <p className="text-text-muted text-xs font-mono uppercase">Customers</p>
+        </div>
+        <div className="card-base p-4 text-center">
+          <p className="font-mono text-2xl font-bold text-accent-blue">{b2bCount}</p>
+          <p className="text-text-muted text-xs font-mono uppercase">B2B Accounts</p>
         </div>
         <div className="card-base p-4 text-center">
           <p className="font-mono text-2xl font-bold text-accent-green">{totalOrders}</p>
@@ -392,7 +263,34 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      {/* Search & filter */}
+      {/* Account type filter */}
+      <div className="flex gap-2 mb-4">
+        {([
+          { key: 'all' as FilterType, label: 'All', icon: Users },
+          { key: 'individual' as FilterType, label: 'Individual', icon: User },
+          { key: 'business' as FilterType, label: 'Business', icon: Building2 },
+        ]).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTypeFilter(key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-mono text-xs transition-all ${
+              typeFilter === key
+                ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/30'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-transparent'
+            }`}
+          >
+            <Icon size={14} />
+            {label}
+            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+              typeFilter === key ? 'bg-accent-amber/20' : 'bg-bg-tertiary'
+            }`}>
+              {typeCounts[key]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search & tag filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -452,13 +350,12 @@ export default function AdminCustomers() {
           <div className="text-center py-12 text-text-muted">
             <Users size={40} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm">
-              {search || tagFilter ? 'No customers match your search.' : 'No customers yet. They\'ll appear here when orders are placed.'}
+              {search || tagFilter || typeFilter !== 'all' ? 'No customers match your filters.' : 'No customers yet. They\'ll appear here when orders are placed.'}
             </p>
           </div>
         )}
       </div>
 
-      {/* Add modal */}
       {adding && (
         <CustomerFormModal
           title="Add Customer"

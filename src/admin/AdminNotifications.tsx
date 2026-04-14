@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bell, ShoppingCart, Car, MessageSquare, Trash2,
-  CheckCheck, ChevronDown, ChevronUp,
-  Package, Mail, Phone, MapPin, Clock, Building2, FileText
+  CheckCheck, ChevronDown, ChevronUp, UserPlus, Receipt, FileText as FileTextIcon,
+  Package, Mail, Phone, MapPin, Clock, Building2, FileText, Check
 } from 'lucide-react'
 import {
   useNotificationsStore,
@@ -12,6 +13,9 @@ import {
   type ContactNotification,
   type NotificationType,
 } from '@/stores/notificationsStore'
+import { useCustomersStore } from '@/stores/customersStore'
+import { useInvoicesStore } from '@/stores/invoicesStore'
+import CustomerFormModal from './components/CustomerFormModal'
 
 type FilterType = 'all' | NotificationType
 
@@ -48,7 +52,9 @@ function TypeBadge({ type }: { type: NotificationType }) {
   )
 }
 
-function OrderDetail({ n }: { n: OrderNotification }) {
+function OrderDetail({ n, onCreateAccount, onCreateInvoice }: { n: OrderNotification; onCreateAccount: () => void; onCreateInvoice: () => void }) {
+  const existingCustomer = useCustomersStore((s) => s.getCustomerByEmail(n.customer.email))
+
   return (
     <div className="space-y-4 mt-4">
       <div className="grid sm:grid-cols-2 gap-4">
@@ -95,11 +101,35 @@ function OrderDetail({ n }: { n: OrderNotification }) {
           </div>
         </div>
       </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+        {existingCustomer ? (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-accent-green px-3 py-1.5 rounded-lg bg-accent-green/5 border border-accent-green/20">
+            <Check size={12} /> Customer exists
+          </span>
+        ) : (
+          <button
+            onClick={onCreateAccount}
+            className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
+          >
+            <UserPlus size={12} /> Create Account
+          </button>
+        )}
+        <button
+          onClick={onCreateInvoice}
+          className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-green px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
+        >
+          <Receipt size={12} /> Create Invoice
+        </button>
+      </div>
     </div>
   )
 }
 
-function PartRequestDetail({ n }: { n: PartRequestNotification }) {
+function PartRequestDetail({ n, onCreateAccount, onCreateQuotation }: { n: PartRequestNotification; onCreateAccount: () => void; onCreateQuotation: () => void }) {
+  const existingCustomer = useCustomersStore((s) => s.getCustomerByEmail(n.business.contactEmail))
+
   return (
     <div className="space-y-4 mt-4">
       <div className="flex items-center gap-2 mb-2">
@@ -150,6 +180,28 @@ function PartRequestDetail({ n }: { n: PartRequestNotification }) {
           </div>
         </div>
       </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+        {existingCustomer ? (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-accent-green px-3 py-1.5 rounded-lg bg-accent-green/5 border border-accent-green/20">
+            <Check size={12} /> Customer exists
+          </span>
+        ) : (
+          <button
+            onClick={onCreateAccount}
+            className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-blue px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
+          >
+            <UserPlus size={12} /> Create B2B Account
+          </button>
+        )}
+        <button
+          onClick={onCreateQuotation}
+          className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
+        >
+          <FileTextIcon size={12} /> Create Quotation
+        </button>
+      </div>
     </div>
   )
 }
@@ -174,13 +226,57 @@ function ContactDetail({ n }: { n: ContactNotification }) {
 
 function NotificationCard({ notification, onDelete }: { notification: Notification; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false)
+  const [showCustomerForm, setShowCustomerForm] = useState(false)
   const markRead = useNotificationsStore((s) => s.markRead)
+  const addCustomer = useCustomersStore((s) => s.addCustomer)
+  const createFromOrder = useInvoicesStore((s) => s.createFromOrder)
+  const createQuotation = useInvoicesStore((s) => s.createQuotationFromPartRequest)
+  const navigate = useNavigate()
 
   const handleExpand = () => {
     if (!expanded && !notification.read) {
       markRead(notification.id)
     }
     setExpanded(!expanded)
+  }
+
+  const handleCreateInvoice = () => {
+    const id = createFromOrder(notification.id)
+    if (id) navigate('/admin/invoices')
+  }
+
+  const handleCreateQuotation = () => {
+    const id = createQuotation(notification.id)
+    if (id) navigate('/admin/quotations')
+  }
+
+  const getCustomerFormInitial = () => {
+    if (notification.type === 'order') {
+      const n = notification as OrderNotification
+      return {
+        accountType: 'individual' as const,
+        name: n.customer.name,
+        email: n.customer.email,
+        phone: n.customer.phone,
+        address: n.customer.address,
+        city: n.customer.city,
+        postalCode: n.customer.postalCode,
+        tags: [] as string[],
+      }
+    }
+    if (notification.type === 'part_request') {
+      const n = notification as PartRequestNotification
+      return {
+        accountType: 'business' as const,
+        name: n.business.contactName,
+        email: n.business.contactEmail,
+        phone: n.business.contactPhone,
+        company: n.business.companyName,
+        vatNumber: n.business.vatNumber,
+        tags: ['B2B'],
+      }
+    }
+    return {}
   }
 
   const title = notification.type === 'order'
@@ -222,10 +318,34 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
       {expanded && (
         <div className="px-4 pb-4 border-t border-border mx-4">
           <p className="text-text-muted text-xs mt-3">{formatDate(notification.date)}</p>
-          {notification.type === 'order' && <OrderDetail n={notification as OrderNotification} />}
-          {notification.type === 'part_request' && <PartRequestDetail n={notification as PartRequestNotification} />}
+          {notification.type === 'order' && (
+            <OrderDetail
+              n={notification as OrderNotification}
+              onCreateAccount={() => setShowCustomerForm(true)}
+              onCreateInvoice={handleCreateInvoice}
+            />
+          )}
+          {notification.type === 'part_request' && (
+            <PartRequestDetail
+              n={notification as PartRequestNotification}
+              onCreateAccount={() => setShowCustomerForm(true)}
+              onCreateQuotation={handleCreateQuotation}
+            />
+          )}
           {notification.type === 'contact' && <ContactDetail n={notification as ContactNotification} />}
         </div>
+      )}
+
+      {showCustomerForm && (
+        <CustomerFormModal
+          title={notification.type === 'part_request' ? 'Create Business Account' : 'Create Customer Account'}
+          initial={getCustomerFormInitial()}
+          onClose={() => setShowCustomerForm(false)}
+          onSave={(data) => {
+            addCustomer(data)
+            setShowCustomerForm(false)
+          }}
+        />
       )}
     </div>
   )

@@ -2,8 +2,20 @@ import { create } from 'zustand'
 
 const STORAGE_KEY = 'aprinting_customers'
 
+export type AccountType = 'individual' | 'business'
+export type PaymentTerms = 'immediate' | 'net15' | 'net30' | 'net60'
+export type DiscountTier = 'none' | 'silver' | 'gold' | 'platinum'
+
+export const DISCOUNT_RATES: Record<DiscountTier, number> = {
+  none: 0,
+  silver: 5,
+  gold: 10,
+  platinum: 15,
+}
+
 export interface Customer {
   id: string
+  accountType: AccountType
   name: string
   email: string
   phone: string
@@ -12,6 +24,11 @@ export interface Customer {
   address?: string
   city?: string
   postalCode?: string
+  billingAddress?: string
+  billingCity?: string
+  billingPostalCode?: string
+  paymentTerms?: PaymentTerms
+  discountTier?: DiscountTier
   notes?: string
   tags: string[]
   totalOrders: number
@@ -27,12 +44,24 @@ interface CustomersState {
   deleteCustomer: (id: string) => void
   recordOrder: (email: string, name: string, phone: string, amount: number, address?: string, city?: string, postalCode?: string) => void
   getCustomerByEmail: (email: string) => Customer | undefined
+  getCustomerById: (id: string) => Customer | undefined
+}
+
+function migrate(customer: Record<string, unknown>): Customer {
+  const c = customer as unknown as Customer
+  if (!c.accountType) {
+    c.accountType = (c.company && c.vatNumber) ? 'business' : 'individual'
+  }
+  return c
 }
 
 function load(): Customer[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, unknown>[]
+      return parsed.map(migrate)
+    }
   } catch { /* ignore */ }
   return []
 }
@@ -102,6 +131,7 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
     } else {
       const customer: Customer = {
         id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        accountType: 'individual',
         name,
         email,
         phone,
@@ -124,5 +154,9 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
 
   getCustomerByEmail: (email) => {
     return get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
+  },
+
+  getCustomerById: (id) => {
+    return get().customers.find((c) => c.id === id)
   },
 }))
