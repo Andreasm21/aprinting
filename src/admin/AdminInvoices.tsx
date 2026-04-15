@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Receipt, Plus, Eye, Trash2, Search, Check, X, Edit3 } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { Receipt, Plus, Eye, Trash2, Search, Check, X, Edit3, ChevronDown, ArrowRight, FileText, DollarSign, Lock } from 'lucide-react'
 import { useInvoicesStore, CYPRUS_VAT_RATE, type Invoice, type InvoiceLineItem, type DocumentStatus } from '@/stores/invoicesStore'
 import { DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
 import CustomerSelector from './components/CustomerSelector'
@@ -32,6 +32,7 @@ export default function AdminInvoices() {
   const [creating, setCreating] = useState(false)
   const [previewing, setPreviewing] = useState<Invoice | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [lockPrompt, setLockPrompt] = useState<{ id: string } | null>(null)
 
   const invoicesList = useMemo(() => {
     return invoices
@@ -107,7 +108,7 @@ export default function AdminInvoices() {
           <p className="text-text-muted text-sm font-mono">No invoices found</p>
         </div>
       ) : (
-        <div className="card-base overflow-hidden">
+        <div className="card-base overflow-visible">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
@@ -130,23 +131,43 @@ export default function AdminInvoices() {
                   <td className="p-3 text-text-secondary text-xs hidden sm:table-cell">{new Date(inv.date).toLocaleDateString('en-GB')}</td>
                   <td className="p-3 text-right font-mono text-sm text-text-primary">€{inv.total.toFixed(2)}</td>
                   <td className="p-3 text-center">
-                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border ${STATUS_COLORS[inv.status]}`}>{inv.status}</span>
+                    {inv.locked ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border text-accent-green border-accent-green/30 bg-accent-green/5">
+                        <Lock size={9} /> Paid
+                      </span>
+                    ) : (
+                      <StatusDropdown
+                        status={inv.status}
+                        onChange={(s) => {
+                          if (s === 'paid') {
+                            updateInvoice(inv.id, { status: 'paid' })
+                            setLockPrompt({ id: inv.id })
+                          } else {
+                            updateInvoice(inv.id, { status: s })
+                          }
+                        }}
+                      />
+                    )}
                   </td>
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => setPreviewing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-amber" title="Preview">
                         <Eye size={14} />
                       </button>
-                      <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={() => { if (confirmDelete === inv.id) { deleteInvoice(inv.id); setConfirmDelete(null) } else { setConfirmDelete(inv.id); setTimeout(() => setConfirmDelete(null), 3000) } }}
-                        className={`p-1.5 rounded ${confirmDelete === inv.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {!inv.locked && (
+                        <>
+                          <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => { if (confirmDelete === inv.id) { deleteInvoice(inv.id); setConfirmDelete(null) } else { setConfirmDelete(inv.id); setTimeout(() => setConfirmDelete(null), 3000) } }}
+                            className={`p-1.5 rounded ${confirmDelete === inv.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -172,6 +193,42 @@ export default function AdminInvoices() {
           onClose={() => { setEditing(null); setCreating(false) }}
           getNextNumber={getNextNumber}
         />
+      )}
+
+      {/* Lock Confirmation */}
+      {lockPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-bg-secondary border border-border rounded-lg max-w-sm w-full p-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-accent-green/10 flex items-center justify-center">
+                <Lock size={22} className="text-accent-green" />
+              </div>
+            </div>
+            <h3 className="font-mono text-sm font-bold text-text-primary text-center mb-2">Lock this invoice?</h3>
+            <p className="text-text-secondary text-xs text-center mb-5">
+              Do you want to lock this invoice to view-only? Once locked, it cannot be edited or deleted.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setLockPrompt(null)
+                }}
+                className="flex-1 btn-outline text-sm py-2"
+              >
+                No
+              </button>
+              <button
+                onClick={() => {
+                  updateInvoice(lockPrompt.id, { locked: true })
+                  setLockPrompt(null)
+                }}
+                className="flex-1 btn-amber text-sm py-2"
+              >
+                Yes, Lock it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Preview */}
@@ -407,6 +464,59 @@ function InvoiceEditor({
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+/* ── Invoice Status Dropdown ─────────────────────────────── */
+
+const INVOICE_STATUSES: { value: DocumentStatus; label: string; color: string; icon: React.ReactNode }[] = [
+  { value: 'draft', label: 'Draft', color: 'text-text-muted', icon: <FileText size={12} /> },
+  { value: 'sent', label: 'Sent', color: 'text-accent-blue', icon: <ArrowRight size={12} /> },
+  { value: 'paid', label: 'Paid', color: 'text-accent-green', icon: <DollarSign size={12} /> },
+  { value: 'cancelled', label: 'Cancelled', color: 'text-red-400', icon: <X size={12} /> },
+]
+
+function StatusDropdown({ status, onChange }: { status: DocumentStatus; onChange: (s: DocumentStatus) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const id = setTimeout(() => document.addEventListener('click', handleClick), 0)
+    return () => { clearTimeout(id); document.removeEventListener('click', handleClick) }
+  }, [open])
+
+  const current = INVOICE_STATUSES.find((s) => s.value === status) || INVOICE_STATUSES[0]
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className={`flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border transition-all hover:brightness-125 cursor-pointer ${STATUS_COLORS[status]}`}
+      >
+        {current.label}
+        <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 min-w-[120px] py-1">
+          {INVOICE_STATUSES.map((s) => (
+            <button
+              key={s.value}
+              onClick={(e) => { e.stopPropagation(); onChange(s.value); setOpen(false) }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-colors hover:bg-bg-tertiary ${
+                s.value === status ? 'bg-bg-tertiary font-bold' : ''
+              } ${s.color}`}
+            >
+              {s.icon}
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const STORAGE_KEY = 'aprinting_notifications'
 
@@ -78,6 +79,10 @@ interface NotificationsState {
   getUnreadCount: () => number
 }
 
+// ---------------------------------------------------------------------------
+// localStorage helpers (cache / fallback)
+// ---------------------------------------------------------------------------
+
 function loadNotifications(): Notification[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -90,84 +95,213 @@ function save(notifications: Notification[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications))
 }
 
-export const useNotificationsStore = create<NotificationsState>((set, get) => ({
-  notifications: loadNotifications(),
+// ---------------------------------------------------------------------------
+// Supabase format converters
+// ---------------------------------------------------------------------------
 
-  addOrder: (order) => {
-    const notification: OrderNotification = {
-      ...order,
-      type: 'order',
-      id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      date: new Date().toISOString(),
-      read: false,
+interface SupabaseNotificationRow {
+  id: string
+  type: NotificationType
+  date: string
+  read: boolean
+  data: Record<string, unknown>
+}
+
+/** Convert a local Notification into the Supabase row shape. */
+function toSupabaseRow(n: Notification): SupabaseNotificationRow {
+  // Pull out the common columns; everything else goes into `data`.
+  const { id, type, date, read, ...rest } = n
+  return { id, type, date, read, data: rest }
+}
+
+/** Reconstruct a full Notification from a Supabase row. */
+function fromSupabaseRow(row: SupabaseNotificationRow): Notification {
+  const { id, type, date, read, data } = row
+  return { id, type, date, read, ...data } as Notification
+}
+
+// ---------------------------------------------------------------------------
+// Supabase fire-and-forget helpers
+// ---------------------------------------------------------------------------
+
+async function sbUpsert(notification: Notification) {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('notifications')
+    .upsert(toSupabaseRow(notification))
+  if (error) console.error('[notifications] Supabase upsert failed:', error)
+}
+
+async function sbUpdate(id: string, fields: Partial<Pick<SupabaseNotificationRow, 'read'>>) {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('notifications')
+    .update(fields)
+    .eq('id', id)
+  if (error) console.error('[notifications] Supabase update failed:', error)
+}
+
+async function sbUpdateAll(fields: Partial<Pick<SupabaseNotificationRow, 'read'>>) {
+  if (!isSupabaseConfigured) return
+  // Update every row — use a filter that matches all rows
+  const { error } = await supabase
+    .from('notifications')
+    .update(fields)
+    .not('id', 'is', null)
+  if (error) console.error('[notifications] Supabase updateAll failed:', error)
+}
+
+async function sbDelete(id: string) {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', id)
+  if (error) console.error('[notifications] Supabase delete failed:', error)
+}
+
+async function sbDeleteAll() {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .not('id', 'is', null)
+  if (error) console.error('[notifications] Supabase deleteAll failed:', error)
+}
+
+// ---------------------------------------------------------------------------
+// Fetch from Supabase and replace local state
+// ---------------------------------------------------------------------------
+
+async function fetchFromSupabase(
+  set: (partial: Partial<NotificationsState>) => void,
+) {
+  if (!isSupabaseConfigured) return
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('date', { ascending: false })
+
+    if (error) {
+      console.error('[notifications] Supabase fetch failed:', error)
+      return
     }
-    set((state) => {
-      const notifications = [notification, ...state.notifications]
-      save(notifications)
-      return { notifications }
-    })
-  },
 
-  addPartRequest: (request) => {
-    const notification: PartRequestNotification = {
-      ...request,
-      type: 'part_request',
-      id: `pr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      date: new Date().toISOString(),
-      read: false,
+    if (data && data.length > 0) {
+      const notifications = (data as SupabaseNotificationRow[]).map(fromSupabaseRow)
+      save(notifications)
+      set({ notifications })
+    } else {
+      // Supabase is empty — push localStorage data up (initial sync)
+      const local = loadNotifications()
+      if (local.length > 0) {
+        console.log(`[notifications] Initial sync: pushing ${local.length} local notifications to Supabase`)
+        for (const n of local) {
+          sbUpsert(n)
+        }
+      }
     }
-    set((state) => {
-      const notifications = [notification, ...state.notifications]
-      save(notifications)
-      return { notifications }
-    })
-  },
+  } catch (err) {
+    console.error('[notifications] Supabase fetch exception:', err)
+  }
+}
 
-  addContact: (contact) => {
-    const notification: ContactNotification = {
-      ...contact,
-      type: 'contact',
-      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      date: new Date().toISOString(),
-      read: false,
-    }
-    set((state) => {
-      const notifications = [notification, ...state.notifications]
-      save(notifications)
-      return { notifications }
-    })
-  },
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
 
-  markRead: (id) => {
-    set((state) => {
-      const notifications = state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      )
-      save(notifications)
-      return { notifications }
-    })
-  },
+export const useNotificationsStore = create<NotificationsState>((set, get) => {
+  // Kick off a Supabase fetch as soon as the store is created.
+  // The localStorage data is loaded synchronously below so the UI is never empty.
+  fetchFromSupabase(set)
 
-  markAllRead: () => {
-    set((state) => {
-      const notifications = state.notifications.map((n) => ({ ...n, read: true }))
-      save(notifications)
-      return { notifications }
-    })
-  },
+  return {
+    notifications: loadNotifications(),
 
-  deleteNotification: (id) => {
-    set((state) => {
-      const notifications = state.notifications.filter((n) => n.id !== id)
-      save(notifications)
-      return { notifications }
-    })
-  },
+    addOrder: (order) => {
+      const notification: OrderNotification = {
+        ...order,
+        type: 'order',
+        id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: new Date().toISOString(),
+        read: false,
+      }
+      set((state) => {
+        const notifications = [notification, ...state.notifications]
+        save(notifications)
+        return { notifications }
+      })
+      sbUpsert(notification)
+    },
 
-  clearAll: () => {
-    localStorage.removeItem(STORAGE_KEY)
-    set({ notifications: [] })
-  },
+    addPartRequest: (request) => {
+      const notification: PartRequestNotification = {
+        ...request,
+        type: 'part_request',
+        id: `pr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: new Date().toISOString(),
+        read: false,
+      }
+      set((state) => {
+        const notifications = [notification, ...state.notifications]
+        save(notifications)
+        return { notifications }
+      })
+      sbUpsert(notification)
+    },
 
-  getUnreadCount: () => get().notifications.filter((n) => !n.read).length,
-}))
+    addContact: (contact) => {
+      const notification: ContactNotification = {
+        ...contact,
+        type: 'contact',
+        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: new Date().toISOString(),
+        read: false,
+      }
+      set((state) => {
+        const notifications = [notification, ...state.notifications]
+        save(notifications)
+        return { notifications }
+      })
+      sbUpsert(notification)
+    },
+
+    markRead: (id) => {
+      set((state) => {
+        const notifications = state.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n
+        )
+        save(notifications)
+        return { notifications }
+      })
+      sbUpdate(id, { read: true })
+    },
+
+    markAllRead: () => {
+      set((state) => {
+        const notifications = state.notifications.map((n) => ({ ...n, read: true }))
+        save(notifications)
+        return { notifications }
+      })
+      sbUpdateAll({ read: true })
+    },
+
+    deleteNotification: (id) => {
+      set((state) => {
+        const notifications = state.notifications.filter((n) => n.id !== id)
+        save(notifications)
+        return { notifications }
+      })
+      sbDelete(id)
+    },
+
+    clearAll: () => {
+      localStorage.removeItem(STORAGE_KEY)
+      set({ notifications: [] })
+      sbDeleteAll()
+    },
+
+    getUnreadCount: () => get().notifications.filter((n) => !n.read).length,
+  }
+})

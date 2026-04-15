@@ -79,6 +79,7 @@ export default function Footer() {
             <a href="#" className="hover:text-accent-amber transition-colors">{t.footer.privacy}</a>
             <a href="#" className="hover:text-accent-amber transition-colors">{t.footer.terms}</a>
             <span className="text-accent-amber">{t.footer.madeIn}</span>
+            <a href="/admin" className="hover:text-text-secondary transition-colors">Admin Login</a>
           </div>
         </div>
       </div>

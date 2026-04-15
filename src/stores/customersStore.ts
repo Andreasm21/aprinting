@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const STORAGE_KEY = 'aprinting_customers'
 
@@ -47,6 +48,125 @@ interface CustomersState {
   getCustomerById: (id: string) => Customer | undefined
 }
 
+// ---------------------------------------------------------------------------
+// camelCase <-> snake_case conversion helpers
+// ---------------------------------------------------------------------------
+
+type SupabaseCustomerRow = {
+  id: string
+  account_type: string
+  name: string
+  email: string
+  phone: string
+  company: string | null
+  vat_number: string | null
+  address: string | null
+  city: string | null
+  postal_code: string | null
+  billing_address: string | null
+  billing_city: string | null
+  billing_postal_code: string | null
+  payment_terms: string | null
+  discount_tier: string | null
+  notes: string | null
+  tags: string[] | null
+  total_orders: number
+  total_spent: number
+  created_at: string
+  last_order_at: string | null
+}
+
+function toSupabaseRow(c: Customer): SupabaseCustomerRow {
+  return {
+    id: c.id,
+    account_type: c.accountType,
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    company: c.company ?? null,
+    vat_number: c.vatNumber ?? null,
+    address: c.address ?? null,
+    city: c.city ?? null,
+    postal_code: c.postalCode ?? null,
+    billing_address: c.billingAddress ?? null,
+    billing_city: c.billingCity ?? null,
+    billing_postal_code: c.billingPostalCode ?? null,
+    payment_terms: c.paymentTerms ?? null,
+    discount_tier: c.discountTier ?? null,
+    notes: c.notes ?? null,
+    tags: c.tags,
+    total_orders: c.totalOrders,
+    total_spent: c.totalSpent,
+    created_at: c.createdAt,
+    last_order_at: c.lastOrderAt ?? null,
+  }
+}
+
+function fromSupabaseRow(row: SupabaseCustomerRow): Customer {
+  return {
+    id: row.id,
+    accountType: (row.account_type ?? 'individual') as AccountType,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    company: row.company ?? undefined,
+    vatNumber: row.vat_number ?? undefined,
+    address: row.address ?? undefined,
+    city: row.city ?? undefined,
+    postalCode: row.postal_code ?? undefined,
+    billingAddress: row.billing_address ?? undefined,
+    billingCity: row.billing_city ?? undefined,
+    billingPostalCode: row.billing_postal_code ?? undefined,
+    paymentTerms: (row.payment_terms as PaymentTerms) ?? undefined,
+    discountTier: (row.discount_tier as DiscountTier) ?? undefined,
+    notes: row.notes ?? undefined,
+    tags: row.tags ?? [],
+    totalOrders: row.total_orders ?? 0,
+    totalSpent: Number(row.total_spent) ?? 0,
+    createdAt: row.created_at,
+    lastOrderAt: row.last_order_at ?? undefined,
+  }
+}
+
+/** Convert a partial Customer update into a partial Supabase row. */
+function partialToSupabaseRow(updates: Partial<Customer>): Record<string, unknown> {
+  const map: Record<string, string> = {
+    id: 'id',
+    accountType: 'account_type',
+    name: 'name',
+    email: 'email',
+    phone: 'phone',
+    company: 'company',
+    vatNumber: 'vat_number',
+    address: 'address',
+    city: 'city',
+    postalCode: 'postal_code',
+    billingAddress: 'billing_address',
+    billingCity: 'billing_city',
+    billingPostalCode: 'billing_postal_code',
+    paymentTerms: 'payment_terms',
+    discountTier: 'discount_tier',
+    notes: 'notes',
+    tags: 'tags',
+    totalOrders: 'total_orders',
+    totalSpent: 'total_spent',
+    createdAt: 'created_at',
+    lastOrderAt: 'last_order_at',
+  }
+  const row: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(updates)) {
+    const snakeKey = map[key]
+    if (snakeKey) {
+      row[snakeKey] = value ?? null
+    }
+  }
+  return row
+}
+
+// ---------------------------------------------------------------------------
+// localStorage helpers (unchanged behaviour)
+// ---------------------------------------------------------------------------
+
 function migrate(customer: Record<string, unknown>): Customer {
   const c = customer as unknown as Customer
   if (!c.accountType) {
@@ -70,93 +190,174 @@ function save(customers: Customer[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(customers))
 }
 
-export const useCustomersStore = create<CustomersState>((set, get) => ({
-  customers: load(),
+// ---------------------------------------------------------------------------
+// Supabase helpers (fire-and-forget — errors are logged, never thrown)
+// ---------------------------------------------------------------------------
 
-  addCustomer: (data) => {
-    const customer: Customer = {
-      ...data,
-      id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: new Date().toISOString(),
-      totalOrders: 0,
-      totalSpent: 0,
+async function supabaseUpsert(customer: Customer) {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('customers')
+    .upsert(toSupabaseRow(customer), { onConflict: 'id' })
+  if (error) console.error('[customers] Supabase upsert failed:', error)
+}
+
+async function supabaseDelete(id: string) {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('customers')
+    .delete()
+    .eq('id', id)
+  if (error) console.error('[customers] Supabase delete failed:', error)
+}
+
+async function fetchFromSupabase(
+  set: (fn: (state: CustomersState) => Partial<CustomersState>) => void,
+) {
+  if (!isSupabaseConfigured) return
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+    if (error) {
+      console.error('[customers] Supabase fetch failed:', error)
+      return
     }
-    set((state) => {
-      const customers = [customer, ...state.customers]
-      save(customers)
-      return { customers }
-    })
-  },
-
-  updateCustomer: (id, updates) => {
-    set((state) => {
-      const customers = state.customers.map((c) =>
-        c.id === id ? { ...c, ...updates } : c
-      )
-      save(customers)
-      return { customers }
-    })
-  },
-
-  deleteCustomer: (id) => {
-    set((state) => {
-      const customers = state.customers.filter((c) => c.id !== id)
-      save(customers)
-      return { customers }
-    })
-  },
-
-  recordOrder: (email, name, phone, amount, address, city, postalCode) => {
-    const existing = get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
-    if (existing) {
-      set((state) => {
-        const customers = state.customers.map((c) =>
-          c.id === existing.id
-            ? {
-                ...c,
-                name: name || c.name,
-                phone: phone || c.phone,
-                address: address || c.address,
-                city: city || c.city,
-                postalCode: postalCode || c.postalCode,
-                totalOrders: c.totalOrders + 1,
-                totalSpent: c.totalSpent + amount,
-                lastOrderAt: new Date().toISOString(),
-              }
-            : c
-        )
-        save(customers)
-        return { customers }
+    if (data && data.length > 0) {
+      const remote = (data as SupabaseCustomerRow[]).map(fromSupabaseRow)
+      set(() => {
+        save(remote)
+        return { customers: remote }
       })
     } else {
+      // Supabase is empty — push localStorage data up (initial sync)
+      const local = load()
+      if (local.length > 0) {
+        console.log(`[customers] Initial sync: pushing ${local.length} local customers to Supabase`)
+        for (const c of local) {
+          supabaseUpsert(c)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[customers] Supabase fetch error:', err)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+export const useCustomersStore = create<CustomersState>((set, get) => {
+  // Kick off background Supabase sync after initial localStorage load
+  fetchFromSupabase(set)
+
+  return {
+    customers: load(),
+
+    addCustomer: (data) => {
       const customer: Customer = {
+        ...data,
         id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        accountType: 'individual',
-        name,
-        email,
-        phone,
-        address,
-        city,
-        postalCode,
-        tags: [],
-        totalOrders: 1,
-        totalSpent: amount,
         createdAt: new Date().toISOString(),
-        lastOrderAt: new Date().toISOString(),
+        totalOrders: 0,
+        totalSpent: 0,
       }
       set((state) => {
         const customers = [customer, ...state.customers]
         save(customers)
         return { customers }
       })
-    }
-  },
+      // Fire-and-forget Supabase write
+      supabaseUpsert(customer)
+    },
 
-  getCustomerByEmail: (email) => {
-    return get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
-  },
+    updateCustomer: (id, updates) => {
+      set((state) => {
+        const customers = state.customers.map((c) =>
+          c.id === id ? { ...c, ...updates } : c
+        )
+        save(customers)
+        return { customers }
+      })
+      // Fire-and-forget Supabase write
+      if (isSupabaseConfigured) {
+        const row = partialToSupabaseRow(updates)
+        supabase
+          .from('customers')
+          .update(row)
+          .eq('id', id)
+          .then(({ error }) => {
+            if (error) console.error('[customers] Supabase update failed:', error)
+          })
+      }
+    },
 
-  getCustomerById: (id) => {
-    return get().customers.find((c) => c.id === id)
-  },
-}))
+    deleteCustomer: (id) => {
+      set((state) => {
+        const customers = state.customers.filter((c) => c.id !== id)
+        save(customers)
+        return { customers }
+      })
+      // Fire-and-forget Supabase delete
+      supabaseDelete(id)
+    },
+
+    recordOrder: (email, name, phone, amount, address, city, postalCode) => {
+      const existing = get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
+      if (existing) {
+        const updatedCustomer: Customer = {
+          ...existing,
+          name: name || existing.name,
+          phone: phone || existing.phone,
+          address: address || existing.address,
+          city: city || existing.city,
+          postalCode: postalCode || existing.postalCode,
+          totalOrders: existing.totalOrders + 1,
+          totalSpent: existing.totalSpent + amount,
+          lastOrderAt: new Date().toISOString(),
+        }
+        set((state) => {
+          const customers = state.customers.map((c) =>
+            c.id === existing.id ? updatedCustomer : c
+          )
+          save(customers)
+          return { customers }
+        })
+        // Fire-and-forget Supabase write
+        supabaseUpsert(updatedCustomer)
+      } else {
+        const customer: Customer = {
+          id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          accountType: 'individual',
+          name,
+          email,
+          phone,
+          address,
+          city,
+          postalCode,
+          tags: [],
+          totalOrders: 1,
+          totalSpent: amount,
+          createdAt: new Date().toISOString(),
+          lastOrderAt: new Date().toISOString(),
+        }
+        set((state) => {
+          const customers = [customer, ...state.customers]
+          save(customers)
+          return { customers }
+        })
+        // Fire-and-forget Supabase write
+        supabaseUpsert(customer)
+      }
+    },
+
+    getCustomerByEmail: (email) => {
+      return get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
+    },
+
+    getCustomerById: (id) => {
+      return get().customers.find((c) => c.id === id)
+    },
+  }
+})

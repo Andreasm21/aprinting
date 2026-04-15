@@ -14,6 +14,7 @@ import CustomPartRequest from '@/components/CustomPartRequest'
 import Footer from '@/components/Footer'
 import Cart from '@/components/Cart'
 import Checkout from '@/components/Checkout'
+import { useVisitorTracking } from '@/hooks/useVisitorTracking'
 
 const AdminLayout = lazy(() => import('@/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('@/admin/AdminDashboard'))
@@ -29,6 +30,7 @@ const AdminInvoices = lazy(() => import('@/admin/AdminInvoices'))
 const AdminQuotations = lazy(() => import('@/admin/AdminQuotations'))
 const AdminEmails = lazy(() => import('@/admin/AdminEmails'))
 const AdminPotion = lazy(() => import('@/admin/AdminPotion'))
+const AdminAnalytics = lazy(() => import('@/admin/AdminAnalytics'))
 
 function AdminLoader({ children }: { children: React.ReactNode }) {
   return (
@@ -42,9 +44,15 @@ function AdminLoader({ children }: { children: React.ReactNode }) {
   )
 }
 
+function SiteTracker() {
+  useVisitorTracking('/')
+  return null
+}
+
 function SitePage() {
   return (
     <>
+      <SiteTracker />
       <Navbar />
       <main>
         <Hero />
@@ -76,6 +84,7 @@ function App() {
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />
+        <Route path="/admin/analytics" element={<AdminLoader><AdminAnalytics /></AdminLoader>} />
         <Route path="/admin/potion" element={<AdminLoader><AdminPotion /></AdminLoader>} />
         <Route path="/admin/products" element={<AdminLoader><AdminProducts /></AdminLoader>} />
         <Route path="/admin/hero" element={<AdminLoader><AdminHero /></AdminLoader>} />

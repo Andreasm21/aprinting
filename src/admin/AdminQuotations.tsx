@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { FileText, Plus, Eye, Trash2, Search, Check, X, Edit3 } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { FileText, Plus, Eye, Trash2, Search, Check, X, Edit3, ChevronDown, ArrowRight, Receipt, Lock } from 'lucide-react'
 import { useInvoicesStore, CYPRUS_VAT_RATE, type Invoice, type InvoiceLineItem, type DocumentStatus } from '@/stores/invoicesStore'
 import { DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
 import CustomerSelector from './components/CustomerSelector'
@@ -31,8 +31,7 @@ function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: 
 }
 
 export default function AdminQuotations() {
-  const { invoices, addInvoice, updateInvoice, deleteInvoice, getNextNumber } = useInvoicesStore()
-
+  const { invoices, addInvoice, updateInvoice, deleteInvoice, getNextNumber, convertToInvoice } = useInvoicesStore()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | DocumentStatus>('all')
@@ -115,7 +114,7 @@ export default function AdminQuotations() {
           <p className="text-text-muted text-sm font-mono">No quotations found</p>
         </div>
       ) : (
-        <div className="card-base overflow-hidden">
+        <div className="card-base overflow-visible">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
@@ -146,25 +145,49 @@ export default function AdminQuotations() {
                   </td>
                   <td className="p-3 text-right font-mono text-sm text-text-primary">€{inv.total.toFixed(2)}</td>
                   <td className="p-3 text-center">
-                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border ${STATUS_COLORS[inv.status]}`}>
-                      {inv.status === 'paid' ? 'accepted' : inv.status}
-                    </span>
+                    {inv.status === 'paid' ? (
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border ${STATUS_COLORS['paid']}`}>
+                        <Lock size={9} /> Accepted
+                      </span>
+                    ) : (
+                      <StatusDropdown
+                        status={inv.status}
+                        onChange={(newStatus) => {
+                          if (newStatus === 'paid' && inv.status !== 'paid') {
+                            convertToInvoice(inv.id)
+                          } else {
+                            updateInvoice(inv.id, { status: newStatus })
+                          }
+                        }}
+                      />
+                    )}
                   </td>
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => setPreviewing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Preview">
                         <Eye size={14} />
                       </button>
-                      <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={() => { if (confirmDelete === inv.id) { deleteInvoice(inv.id); setConfirmDelete(null) } else { setConfirmDelete(inv.id); setTimeout(() => setConfirmDelete(null), 3000) } }}
-                        className={`p-1.5 rounded ${confirmDelete === inv.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {inv.status !== 'paid' && (
+                        <>
+                          <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => convertToInvoice(inv.id)}
+                            className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-green"
+                            title="Convert to Invoice"
+                          >
+                            <Receipt size={14} />
+                          </button>
+                          <button
+                            onClick={() => { if (confirmDelete === inv.id) { deleteInvoice(inv.id); setConfirmDelete(null) } else { setConfirmDelete(inv.id); setTimeout(() => setConfirmDelete(null), 3000) } }}
+                            className={`p-1.5 rounded ${confirmDelete === inv.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -420,6 +443,63 @@ function QuotationEditor({
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+/* ── Status Dropdown ─────────────────────────────── */
+
+const QUOTE_STATUSES: { value: DocumentStatus; label: string; color: string; icon: React.ReactNode }[] = [
+  { value: 'draft', label: 'Draft', color: 'text-text-muted', icon: <FileText size={12} /> },
+  { value: 'sent', label: 'Sent', color: 'text-accent-blue', icon: <ArrowRight size={12} /> },
+  { value: 'paid', label: 'Accepted', color: 'text-accent-green', icon: <Check size={12} /> },
+  { value: 'cancelled', label: 'Cancelled', color: 'text-red-400', icon: <X size={12} /> },
+]
+
+function StatusDropdown({ status, onChange }: { status: DocumentStatus; onChange: (s: DocumentStatus) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    // Use setTimeout to avoid catching the same click that opened the dropdown
+    const id = setTimeout(() => document.addEventListener('click', handleClick), 0)
+    return () => { clearTimeout(id); document.removeEventListener('click', handleClick) }
+  }, [open])
+
+  const current = QUOTE_STATUSES.find((s) => s.value === status) || QUOTE_STATUSES[0]
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className={`flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border transition-all hover:brightness-125 cursor-pointer ${STATUS_COLORS[status]}`}
+      >
+        {current.label}
+        <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 min-w-[140px] py-1">
+          {QUOTE_STATUSES.map((s) => (
+            <button
+              key={s.value}
+              onClick={(e) => { e.stopPropagation(); onChange(s.value); setOpen(false) }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-colors hover:bg-bg-tertiary ${
+                s.value === status ? 'bg-bg-tertiary font-bold' : ''
+              } ${s.color}`}
+            >
+              {s.icon}
+              {s.label}
+              {s.value === 'paid' && status !== 'paid' && (
+                <span className="ml-auto text-[9px] text-accent-green opacity-70">+ invoice</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

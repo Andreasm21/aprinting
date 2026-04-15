@@ -206,7 +206,9 @@ function PartRequestDetail({ n, onCreateAccount, onCreateQuotation }: { n: PartR
   )
 }
 
-function ContactDetail({ n }: { n: ContactNotification }) {
+function ContactDetail({ n, onCreateAccount }: { n: ContactNotification; onCreateAccount: () => void }) {
+  const existingCustomer = useCustomersStore((s) => s.getCustomerByEmail(n.email))
+
   return (
     <div className="space-y-3 mt-4">
       <div className="space-y-2 text-sm">
@@ -219,6 +221,22 @@ function ContactDetail({ n }: { n: ContactNotification }) {
       <div className="bg-bg-tertiary rounded-lg p-4">
         <p className="font-mono text-xs text-text-muted uppercase mb-2">Message</p>
         <p className="text-text-primary text-sm whitespace-pre-wrap">{n.message}</p>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+        {existingCustomer ? (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-accent-green px-3 py-1.5 rounded-lg bg-accent-green/5 border border-accent-green/20">
+            <Check size={12} /> Customer exists
+          </span>
+        ) : (
+          <button
+            onClick={onCreateAccount}
+            className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
+          >
+            <UserPlus size={12} /> Create Customer
+          </button>
+        )}
       </div>
     </div>
   )
@@ -274,6 +292,16 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
         company: n.business.companyName,
         vatNumber: n.business.vatNumber,
         tags: ['B2B'],
+      }
+    }
+    if (notification.type === 'contact') {
+      const n = notification as ContactNotification
+      return {
+        accountType: 'individual' as const,
+        name: n.name,
+        email: n.email,
+        phone: '',
+        tags: [] as string[],
       }
     }
     return {}
@@ -332,7 +360,12 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
               onCreateQuotation={handleCreateQuotation}
             />
           )}
-          {notification.type === 'contact' && <ContactDetail n={notification as ContactNotification} />}
+          {notification.type === 'contact' && (
+            <ContactDetail
+              n={notification as ContactNotification}
+              onCreateAccount={() => setShowCustomerForm(true)}
+            />
+          )}
         </div>
       )}
 

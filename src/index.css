@@ -173,40 +173,128 @@
 
 /* Print styles for invoices & quotations */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  /* Reset everything */
+  *, *::before, *::after {
+    box-shadow: none !important;
   }
 
-  .print\\:hidden,
-  aside,
-  nav,
-  button:not(#printable-document button) {
+  html, body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide EVERYTHING by default */
+  body > * {
     display: none !important;
   }
 
-  #printable-document {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: white;
-    padding: 20mm;
-    margin: 0;
-    box-shadow: none;
-    border: none;
+  /* Then show only the React root */
+  body > #root {
+    display: block !important;
   }
 
-  .fixed {
+  /* Hide all admin chrome, overlays, sidebar, nav, buttons */
+  aside,
+  nav,
+  .print\\:hidden,
+  button,
+  [class*="lg\\:hidden"],
+  [class*="fixed top"],
+  .fixed:not(#print-overlay) {
+    display: none !important;
+  }
+
+  /* The print overlay (DocumentPreview backdrop) — make it fill the page, white bg */
+  #print-overlay {
+    display: block !important;
     position: static !important;
-    background: transparent !important;
-  }
-
-  main {
+    background: white !important;
     padding: 0 !important;
     margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    height: auto !important;
+    z-index: auto !important;
+  }
+
+  /* The white document card inside the overlay */
+  #print-overlay > div {
+    max-width: none !important;
+    max-height: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* The actual printable document content */
+  #printable-document {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    background: white !important;
+    padding: 10mm !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: visible !important;
+    page-break-inside: auto;
+  }
+
+  /* Ensure bg colors are printed (for bill-to section etc) */
+  #printable-document .bg-gray-50 {
+    background-color: #F9FAFB !important;
+  }
+
+  /* Table borders */
+  #printable-document table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  #printable-document tr {
+    page-break-inside: avoid;
+  }
+
+  /* Make sure text is readable */
+  #printable-document * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Force all parent containers to be visible and unstyled */
+  #root,
+  #root > div,
+  #root > div > div,
+  #root > div > div > div {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    background: white !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+
+  /* Hide the admin main content when document preview is open */
+  main {
+    display: none !important;
   }
 
   @page {

@@ -16,7 +16,7 @@ export default function DocumentPreview({ doc, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
+    <div id="print-overlay" className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-lg max-w-3xl w-full max-h-[95vh] overflow-y-auto relative">
         {/* Screen-only controls */}
         <div className="flex items-center justify-between p-4 border-b print:hidden">

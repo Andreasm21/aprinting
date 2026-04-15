@@ -1,8 +1,23 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BookOpen } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BookOpen, BarChart3, Lock, LogOut } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
+
+function verifyPassword(input: string): boolean {
+  return input === '15583712'
+}
+
+function isAuthenticated(): boolean {
+  try { return sessionStorage.getItem('axiom_admin_auth') === '1' } catch { return false }
+}
+
+function setAuthenticated(v: boolean) {
+  try {
+    if (v) sessionStorage.setItem('axiom_admin_auth', '1')
+    else sessionStorage.removeItem('axiom_admin_auth')
+  } catch { /* no-op */ }
+}
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,6 +26,7 @@ const navItems = [
   { path: '/admin/invoices', label: 'Invoices', icon: Receipt },
   { path: '/admin/quotations', label: 'Quotations', icon: FileText },
   { path: '/admin/emails', label: 'Emails', icon: Mail },
+  { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/admin/potion', label: 'Potion', icon: BookOpen },
   { path: '/admin/products', label: 'Products', icon: Package },
   { path: '/admin/hero', label: 'Hero Section', icon: FileText },
@@ -26,6 +42,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const unreadCount = useNotificationsStore((s) => s.getUnreadCount())
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [authed, setAuthed] = useState(isAuthenticated)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(false)
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (verifyPassword(password)) {
+      setAuthenticated(true)
+      setAuthed(true)
+      setError(false)
+    } else {
+      setError(true)
+      setPassword('')
+    }
+  }
+
+  const handleLogout = () => {
+    setAuthenticated(false)
+    setAuthed(false)
+    setPassword('')
+  }
 
   const handleReset = () => {
     if (confirmReset) {
@@ -35,6 +72,56 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setConfirmReset(true)
       setTimeout(() => setConfirmReset(false), 3000)
     }
+  }
+
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
+        <form onSubmit={handleLogin} className="w-full max-w-sm">
+          <div className="card-base p-8">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
+                <Lock size={24} className="text-accent-amber" />
+              </div>
+            </div>
+            <div className="text-center mb-6">
+              <div className="flex items-baseline justify-center gap-0 mb-1">
+                <span className="font-mono text-xl font-bold text-accent-amber">A</span>
+                <span className="font-mono text-xl font-bold text-text-primary">xiom</span>
+              </div>
+              <p className="text-text-muted text-xs font-mono">Admin Panel</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(false) }}
+                  placeholder="Enter admin password"
+                  autoFocus
+                  className={`w-full bg-bg-tertiary border rounded-lg px-4 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-amber transition-colors ${
+                    error ? 'border-red-500' : 'border-border'
+                  }`}
+                />
+                {error && (
+                  <p className="text-red-400 text-xs font-mono mt-1.5">Incorrect password. Try again.</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-accent-amber text-bg-primary font-mono text-sm font-bold py-2.5 rounded-lg hover:bg-accent-amber/90 transition-colors"
+              >
+                Login
+              </button>
+            </div>
+          </div>
+          <p className="text-center text-text-muted text-[10px] font-mono mt-4">
+            <a href="/" className="hover:text-accent-amber transition-colors">Back to site</a>
+          </p>
+        </form>
+      </div>
+    )
   }
 
   return (
@@ -108,6 +195,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <RotateCcw size={16} />
             {confirmReset ? 'Click again to confirm' : 'Reset All Data'}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-mono w-full text-text-muted hover:text-red-400 hover:bg-bg-tertiary transition-all"
+          >
+            <LogOut size={16} />
+            Logout
           </button>
         </div>
       </aside>
