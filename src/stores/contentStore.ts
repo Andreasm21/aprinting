@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Product } from '@/types'
 import { products as defaultProducts } from '@/data/products'
+import { useAuditLogStore } from './auditLogStore'
 
 const STORAGE_KEY_PRODUCTS = 'aprinting_products'
 const STORAGE_KEY_CONTENT = 'aprinting_content'
@@ -151,22 +152,27 @@ export const useContentStore = create<ContentState>((set, get) => ({
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
       return { products }
     })
+    useAuditLogStore.getState().log('create', 'product', `Product "${product.name}" added`)
   },
 
   updateProduct: (id, updates) => {
+    const p = get().products.find((p) => p.id === id)
     set((state) => {
       const products = state.products.map((p) => (p.id === id ? { ...p, ...updates } : p))
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
       return { products }
     })
+    if (p) useAuditLogStore.getState().log('update', 'product', `Product "${p.name}" updated`)
   },
 
   deleteProduct: (id) => {
+    const p = get().products.find((p) => p.id === id)
     set((state) => {
       const products = state.products.filter((p) => p.id !== id)
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
       return { products }
     })
+    if (p) useAuditLogStore.getState().log('delete', 'product', `Product "${p.name}" deleted`)
   },
 
   updateContent: (section, data) => {
@@ -178,6 +184,7 @@ export const useContentStore = create<ContentState>((set, get) => ({
       localStorage.setItem(STORAGE_KEY_CONTENT, JSON.stringify(content))
       return { content }
     })
+    useAuditLogStore.getState().log('update', 'content', `${String(section)} section updated`)
   },
 
   updatePricingRow: (table, index, data) => {
@@ -224,5 +231,6 @@ export const useContentStore = create<ContentState>((set, get) => ({
     localStorage.removeItem(STORAGE_KEY_PRODUCTS)
     localStorage.removeItem(STORAGE_KEY_CONTENT)
     set({ products: defaultProducts, content: defaultContent })
+    useAuditLogStore.getState().log('reset', 'system', 'All data reset to defaults')
   },
 }))

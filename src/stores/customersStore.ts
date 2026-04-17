@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useActivitiesStore } from './activitiesStore'
+import { useAuditLogStore } from './auditLogStore'
 
 const STORAGE_KEY = 'aprinting_customers'
 
@@ -34,6 +36,9 @@ export interface Customer {
   tags: string[]
   totalOrders: number
   totalSpent: number
+  passwordHash?: string
+  portalEnabled?: boolean
+  lastLoginAt?: string
   createdAt: string
   lastOrderAt?: string
 }
@@ -72,6 +77,9 @@ type SupabaseCustomerRow = {
   tags: string[] | null
   total_orders: number
   total_spent: number
+  password_hash: string | null
+  portal_enabled: boolean
+  last_login_at: string | null
   created_at: string
   last_order_at: string | null
 }
@@ -97,6 +105,9 @@ function toSupabaseRow(c: Customer): SupabaseCustomerRow {
     tags: c.tags,
     total_orders: c.totalOrders,
     total_spent: c.totalSpent,
+    password_hash: c.passwordHash ?? null,
+    portal_enabled: c.portalEnabled ?? false,
+    last_login_at: c.lastLoginAt ?? null,
     created_at: c.createdAt,
     last_order_at: c.lastOrderAt ?? null,
   }
@@ -123,6 +134,9 @@ function fromSupabaseRow(row: SupabaseCustomerRow): Customer {
     tags: row.tags ?? [],
     totalOrders: row.total_orders ?? 0,
     totalSpent: Number(row.total_spent) ?? 0,
+    passwordHash: row.password_hash ?? undefined,
+    portalEnabled: row.portal_enabled ?? false,
+    lastLoginAt: row.last_login_at ?? undefined,
     createdAt: row.created_at,
     lastOrderAt: row.last_order_at ?? undefined,
   }
@@ -150,6 +164,9 @@ function partialToSupabaseRow(updates: Partial<Customer>): Record<string, unknow
     tags: 'tags',
     totalOrders: 'total_orders',
     totalSpent: 'total_spent',
+    passwordHash: 'password_hash',
+    portalEnabled: 'portal_enabled',
+    lastLoginAt: 'last_login_at',
     createdAt: 'created_at',
     lastOrderAt: 'last_order_at',
   }
@@ -270,6 +287,15 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
       })
       // Fire-and-forget Supabase write
       supabaseUpsert(customer)
+      // Auto-log activity
+      useActivitiesStore.getState().addActivity({
+        customerId: customer.id,
+        type: 'note',
+        title: 'Customer account created',
+        description: `${customer.accountType === 'business' ? 'Business' : 'Individual'} account`,
+        metadata: {},
+      })
+      useAuditLogStore.getState().log('create', 'customer', `Customer "${customer.name}" created`, customer.email)
     },
 
     updateCustomer: (id, updates) => {
@@ -291,9 +317,13 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
             if (error) console.error('[customers] Supabase update failed:', error)
           })
       }
+      const c = get().customers.find((c) => c.id === id)
+      if (c) useAuditLogStore.getState().log('update', 'customer', `Customer "${c.name}" updated`, '', updates as Record<string, unknown>)
     },
 
     deleteCustomer: (id) => {
+      const c = get().customers.find((c) => c.id === id)
+      if (c) useAuditLogStore.getState().log('delete', 'customer', `Customer "${c.name}" deleted`, c.email)
       set((state) => {
         const customers = state.customers.filter((c) => c.id !== id)
         save(customers)
@@ -326,6 +356,14 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
         })
         // Fire-and-forget Supabase write
         supabaseUpsert(updatedCustomer)
+        // Auto-log activity
+        useActivitiesStore.getState().addActivity({
+          customerId: existing.id,
+          type: 'order',
+          title: `Order placed — €${amount.toFixed(2)}`,
+          description: '',
+          metadata: { amount },
+        })
       } else {
         const customer: Customer = {
           id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

@@ -203,9 +203,9 @@
   /* Hide all admin chrome, overlays, sidebar, nav, buttons */
   aside,
   nav,
-  .print\\:hidden,
+  [class*="print:hidden"],
   button,
-  [class*="lg\\:hidden"],
+  [class*="lg:hidden"],
   [class*="fixed top"],
   .fixed:not(#print-overlay) {
     display: none !important;
@@ -269,7 +269,7 @@
 
   /* Make sure text is readable */
   #printable-document * {
-    color-adjust: exact !important;
+    print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
 

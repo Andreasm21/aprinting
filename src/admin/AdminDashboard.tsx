@@ -1,10 +1,82 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BookOpen, BarChart3 } from 'lucide-react'
+import {
+  Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BarChart3,
+  Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock
+} from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
-import { usePotionStore } from '@/stores/potionStore'
+import { useAuditLogStore, type AuditAction, type AuditCategory } from '@/stores/auditLogStore'
+
+const ACTION_ICONS: Record<AuditAction, typeof Plus> = {
+  create: Plus,
+  update: Edit3,
+  delete: Trash2,
+  status_change: TrendingUp,
+  convert: FileText,
+  lock: Lock,
+  login: Users,
+  reset: RotateCcw,
+}
+
+const CATEGORY_COLORS: Record<AuditCategory, string> = {
+  customer: 'text-accent-blue bg-accent-blue/10',
+  invoice: 'text-accent-amber bg-accent-amber/10',
+  quotation: 'text-accent-blue bg-accent-blue/10',
+  notification: 'text-accent-green bg-accent-green/10',
+  product: 'text-accent-amber bg-accent-amber/10',
+  content: 'text-text-muted bg-bg-tertiary',
+  system: 'text-red-400 bg-red-400/10',
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString('en-GB')
+}
+
+function RecentActivityFeed() {
+  const entries = useAuditLogStore((s) => s.entries)
+  const recent = useMemo(() => entries.slice(0, 15), [entries])
+
+  if (recent.length === 0) return null
+
+  return (
+    <div className="mt-8 card-base p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Clock size={16} className="text-accent-amber" />
+        <h3 className="font-mono text-sm font-bold text-text-primary">Recent Activity</h3>
+        <span className="text-[10px] font-mono text-text-muted ml-auto">Last {recent.length} actions</span>
+      </div>
+      <div className="space-y-1">
+        {recent.map((entry) => {
+          const Icon = ACTION_ICONS[entry.action] || Edit3
+          const color = CATEGORY_COLORS[entry.category] || 'text-text-muted bg-bg-tertiary'
+          return (
+            <div key={entry.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${color}`}>
+                <Icon size={12} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-text-primary truncate">{entry.label}</p>
+                {entry.detail && <p className="text-[11px] text-text-muted truncate">{entry.detail}</p>}
+              </div>
+              <span className="text-[10px] font-mono text-text-muted shrink-0">{timeAgo(entry.createdAt)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function AdminDashboard() {
   const products = useContentStore((s) => s.products)
@@ -13,7 +85,6 @@ export default function AdminDashboard() {
   const allInvoices = useInvoicesStore((s) => s.invoices)
   const invoiceCount = allInvoices.filter((i) => i.type === 'invoice').length
   const quotationCount = allInvoices.filter((i) => i.type === 'quotation').length
-  const potionPageCount = Object.keys(usePotionStore.getState().pages).length
   const unread = getUnreadCount()
 
   const cards = [
@@ -23,7 +94,6 @@ export default function AdminDashboard() {
     { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/quotations', color: 'blue' },
     { label: 'Analytics', icon: BarChart3, path: '/admin/analytics', color: 'green' },
     { label: 'Emails', icon: Mail, path: '/admin/emails', color: 'green' },
-    { label: 'Potion', count: potionPageCount, icon: BookOpen, path: '/admin/potion', color: 'amber' },
     { label: 'Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },
     { label: 'Hero Section', icon: FileText, path: '/admin/hero', color: 'blue' },
     { label: 'Services', icon: FileText, path: '/admin/services', color: 'amber' },
@@ -68,15 +138,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="mt-10 card-base p-5">
-        <h3 className="font-mono text-sm font-bold text-text-primary mb-2">Quick Tips</h3>
-        <ul className="text-text-secondary text-sm space-y-1.5">
-          <li>- All changes save automatically to your browser's local storage.</li>
-          <li>- Click "View Site" in the sidebar to see your changes live.</li>
-          <li>- Use "Reset All Data" to restore original defaults.</li>
-          <li>- Products and content persist between browser sessions.</li>
-        </ul>
-      </div>
+      <RecentActivityFeed />
     </div>
   )
 }

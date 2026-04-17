@@ -29,8 +29,16 @@ const AdminCustomers = lazy(() => import('@/admin/AdminCustomers'))
 const AdminInvoices = lazy(() => import('@/admin/AdminInvoices'))
 const AdminQuotations = lazy(() => import('@/admin/AdminQuotations'))
 const AdminEmails = lazy(() => import('@/admin/AdminEmails'))
-const AdminPotion = lazy(() => import('@/admin/AdminPotion'))
 const AdminAnalytics = lazy(() => import('@/admin/AdminAnalytics'))
+const AdminCustomerProfile = lazy(() => import('@/admin/AdminCustomerProfile'))
+
+// Portal (customer-facing)
+const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
+const PortalDashboard = lazy(() => import('@/portal/PortalDashboard'))
+const PortalDocuments = lazy(() => import('@/portal/PortalDocuments'))
+const PortalOrders = lazy(() => import('@/portal/PortalOrders'))
+const PortalProfile = lazy(() => import('@/portal/PortalProfile'))
+const PortalStore = lazy(() => import('@/portal/PortalStore'))
 
 function AdminLoader({ children }: { children: React.ReactNode }) {
   return (
@@ -81,17 +89,24 @@ function App() {
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
+        <Route path="/admin/customers/:id" element={<AdminLoader><AdminCustomerProfile /></AdminLoader>} />
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />
         <Route path="/admin/analytics" element={<AdminLoader><AdminAnalytics /></AdminLoader>} />
-        <Route path="/admin/potion" element={<AdminLoader><AdminPotion /></AdminLoader>} />
         <Route path="/admin/products" element={<AdminLoader><AdminProducts /></AdminLoader>} />
         <Route path="/admin/hero" element={<AdminLoader><AdminHero /></AdminLoader>} />
         <Route path="/admin/services" element={<AdminLoader><AdminServices /></AdminLoader>} />
         <Route path="/admin/pricing" element={<AdminLoader><AdminPricing /></AdminLoader>} />
         <Route path="/admin/about" element={<AdminLoader><AdminAbout /></AdminLoader>} />
         <Route path="/admin/contact" element={<AdminLoader><AdminContact /></AdminLoader>} />
+
+        {/* Customer Portal */}
+        <Route path="/portal" element={<Suspense fallback={null}><PortalLayout><PortalDashboard /></PortalLayout></Suspense>} />
+        <Route path="/portal/store" element={<Suspense fallback={null}><PortalLayout><PortalStore /></PortalLayout></Suspense>} />
+        <Route path="/portal/documents" element={<Suspense fallback={null}><PortalLayout><PortalDocuments /></PortalLayout></Suspense>} />
+        <Route path="/portal/orders" element={<Suspense fallback={null}><PortalLayout><PortalOrders /></PortalLayout></Suspense>} />
+        <Route path="/portal/profile" element={<Suspense fallback={null}><PortalLayout><PortalProfile /></PortalLayout></Suspense>} />
       </Routes>
     </BrowserRouter>
   )

@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Users, Plus, Pencil, Trash2, Search,
   Mail, Phone, MapPin, Building2, FileText, ShoppingCart,
-  ChevronDown, ChevronUp, Tag, User
+  ChevronDown, ChevronUp, Tag, User, ExternalLink
 } from 'lucide-react'
 import { useCustomersStore, type Customer, type AccountType } from '@/stores/customersStore'
 import CustomerFormModal from './components/CustomerFormModal'
@@ -20,6 +21,7 @@ function timeAgo(dateStr: string): string {
 }
 
 function CustomerRow({ customer }: { customer: Customer }) {
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const { updateCustomer, deleteCustomer } = useCustomersStore()
   const [editing, setEditing] = useState(false)
@@ -91,6 +93,13 @@ function CustomerRow({ customer }: { customer: Customer }) {
         </td>
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/admin/customers/${customer.id}`) }}
+              className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-accent-blue transition-all"
+              title="View Profile"
+            >
+              <ExternalLink size={14} />
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); setEditing(true) }}
               className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-accent-amber transition-all"

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useAuditLogStore } from './auditLogStore'
 
 const STORAGE_KEY = 'aprinting_notifications'
 
@@ -233,6 +234,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         return { notifications }
       })
       sbUpsert(notification)
+      useAuditLogStore.getState().log('create', 'notification', `New order received`, `€${notification.total.toFixed(2)} — ${notification.customer.name}`)
     },
 
     addPartRequest: (request) => {
@@ -249,6 +251,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         return { notifications }
       })
       sbUpsert(notification)
+      useAuditLogStore.getState().log('create', 'notification', `New part request received`, `${notification.details.partName} — ${notification.business.contactName}`)
     },
 
     addContact: (contact) => {
@@ -265,6 +268,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         return { notifications }
       })
       sbUpsert(notification)
+      useAuditLogStore.getState().log('create', 'notification', `New contact message`, `From ${notification.name}`)
     },
 
     markRead: (id) => {
@@ -288,6 +292,8 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
     },
 
     deleteNotification: (id) => {
+      const n = get().notifications.find((n) => n.id === id)
+      if (n) useAuditLogStore.getState().log('delete', 'notification', `Notification deleted`, n.type)
       set((state) => {
         const notifications = state.notifications.filter((n) => n.id !== id)
         save(notifications)
@@ -297,9 +303,11 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
     },
 
     clearAll: () => {
+      const count = get().notifications.length
       localStorage.removeItem(STORAGE_KEY)
       set({ notifications: [] })
       sbDeleteAll()
+      if (count > 0) useAuditLogStore.getState().log('delete', 'notification', `All notifications cleared`, `${count} removed`)
     },
 
     getUnreadCount: () => get().notifications.filter((n) => !n.read).length,

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { X, Check, User, Building2 } from 'lucide-react'
+import { X, Check, User, Building2, Shield, Copy, RefreshCw } from 'lucide-react'
+import bcrypt from 'bcryptjs'
 import type { Customer, AccountType, PaymentTerms, DiscountTier } from '@/stores/customersStore'
 
 export const TAG_PRESETS = ['VIP', 'B2B', 'Wholesale', 'Recurring', 'Car Parts', 'Prototype', 'New']
@@ -53,6 +54,27 @@ export default function CustomerFormModal({
     tags: initial.tags || [],
   })
 
+  const [portalEnabled, setPortalEnabled] = useState(initial.portalEnabled || false)
+  const [generatedPassword, setGeneratedPassword] = useState('')
+  const [passwordHash, setPasswordHash] = useState(initial.passwordHash || '')
+  const [copied, setCopied] = useState(false)
+
+  const generatePassword = async () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    let pw = ''
+    for (let i = 0; i < 10; i++) pw += chars[Math.floor(Math.random() * chars.length)]
+    setGeneratedPassword(pw)
+    const hash = await bcrypt.hash(pw, 10)
+    setPasswordHash(hash)
+    setCopied(false)
+  }
+
+  const copyPassword = () => {
+    navigator.clipboard.writeText(generatedPassword)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const isBusiness = form.accountType === 'business'
 
   const toggleTag = (tag: string) => {
@@ -81,6 +103,8 @@ export default function CustomerFormModal({
       discountTier: isBusiness ? form.discountTier : undefined,
       notes: form.notes || undefined,
       tags: form.tags,
+      portalEnabled,
+      passwordHash: passwordHash || undefined,
     })
   }
 
@@ -240,6 +264,55 @@ export default function CustomerFormModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Portal Access */}
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-mono text-xs text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                <Shield size={12} /> Customer Portal Access
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPortalEnabled(!portalEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${portalEnabled ? 'bg-accent-green' : 'bg-bg-tertiary border border-border'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${portalEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+
+            {portalEnabled && (
+              <div className="space-y-3 bg-bg-tertiary rounded-lg p-3">
+                <p className="text-text-muted text-xs">
+                  {passwordHash && !generatedPassword ? 'Portal access is active. Generate a new password to reset.' : 'Generate a password for this customer to access the portal.'}
+                </p>
+                {generatedPassword ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={generatedPassword}
+                        className="input-field text-sm font-mono flex-1"
+                      />
+                      <button type="button" onClick={copyPassword} className="btn-outline text-xs py-2 px-3 flex items-center gap-1">
+                        <Copy size={12} /> {copied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-accent-amber text-[11px] font-mono">
+                      Copy this password now — it won't be shown again after saving.
+                    </p>
+                    <button type="button" onClick={generatePassword} className="text-xs font-mono text-text-muted hover:text-accent-amber flex items-center gap-1">
+                      <RefreshCw size={10} /> Regenerate
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={generatePassword} className="btn-amber text-xs py-1.5 px-3 flex items-center gap-1.5">
+                    <Shield size={12} /> Generate Password
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

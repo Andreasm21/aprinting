@@ -3,6 +3,8 @@ import { useNotificationsStore, type OrderNotification, type PartRequestNotifica
 import { useContentStore } from './contentStore'
 import { useCustomersStore } from './customersStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useActivitiesStore } from './activitiesStore'
+import { useAuditLogStore } from './auditLogStore'
 
 const STORAGE_KEY = 'aprinting_invoices'
 export const CYPRUS_VAT_RATE = 0.19
@@ -228,6 +230,19 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
       })
       // Fire-and-forget Supabase sync
       upsertToSupabase(invoice)
+      // Auto-log activity
+      if (data.customerId) {
+        const typeLabel = data.type === 'quotation' ? 'Quotation' : 'Invoice'
+        useActivitiesStore.getState().addActivity({
+          customerId: data.customerId,
+          type: data.type === 'quotation' ? 'quotation' : 'invoice',
+          title: `${typeLabel} ${data.documentNumber} created`,
+          description: `Total: €${data.total.toFixed(2)}`,
+          metadata: { documentId: id, documentNumber: data.documentNumber, total: data.total },
+        })
+      }
+      const cat = data.type === 'quotation' ? 'quotation' as const : 'invoice' as const
+      useAuditLogStore.getState().log('create', cat, `${data.type === 'quotation' ? 'Quotation' : 'Invoice'} ${data.documentNumber} created`, `€${data.total.toFixed(2)} — ${data.customerName}`)
       return id
     },
 
@@ -245,16 +260,29 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         return { invoices }
       })
       // Fire-and-forget Supabase sync
-      if (updated) upsertToSupabase(updated)
+      if (updated) {
+        upsertToSupabase(updated)
+        if (updates.status) {
+          const cat = updated.type === 'quotation' ? 'quotation' as const : 'invoice' as const
+          useAuditLogStore.getState().log('status_change', cat, `${updated.documentNumber} → ${updates.status}`, updated.customerName)
+        }
+        if (updates.locked) {
+          useAuditLogStore.getState().log('lock', 'invoice', `${updated.documentNumber} locked`, 'Set to view-only')
+        }
+      }
     },
 
     deleteInvoice: (id) => {
+      const doc = get().invoices.find((inv) => inv.id === id)
+      if (doc) {
+        const cat = doc.type === 'quotation' ? 'quotation' as const : 'invoice' as const
+        useAuditLogStore.getState().log('delete', cat, `${doc.documentNumber} deleted`, doc.customerName)
+      }
       set((state) => {
         const invoices = state.invoices.filter((inv) => inv.id !== id)
         save(invoices)
         return { invoices }
       })
-      // Fire-and-forget Supabase sync
       deleteFromSupabase(id)
     },
 
@@ -304,6 +332,17 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
       // Mark the quotation as accepted
       get().updateInvoice(quotationId, { status: 'paid' })
+
+      // Auto-log conversion activity
+      if (quote.customerId) {
+        useActivitiesStore.getState().addActivity({
+          customerId: quote.customerId,
+          type: 'status_change',
+          title: `${quote.documentNumber} accepted → ${invoiceNumber} created`,
+          description: `Quotation converted to invoice. Total: €${quote.total.toFixed(2)}`,
+          metadata: { quotationId, invoiceId, total: quote.total },
+        })
+      }
 
       return invoiceId
     },
