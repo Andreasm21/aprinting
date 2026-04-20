@@ -2,12 +2,13 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BarChart3,
-  Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock
+  Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock, Boxes
 } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
+import { useInventoryStore } from '@/stores/inventoryStore'
 import { useAuditLogStore, type AuditAction, type AuditCategory } from '@/stores/auditLogStore'
 
 const ACTION_ICONS: Record<AuditAction, typeof Plus> = {
@@ -86,12 +87,14 @@ export default function AdminDashboard() {
   const invoiceCount = allInvoices.filter((i) => i.type === 'invoice').length
   const quotationCount = allInvoices.filter((i) => i.type === 'quotation').length
   const unread = getUnreadCount()
+  const inventoryCount = useInventoryStore((s) => s.products.length)
 
   const cards = [
     { label: 'Notifications', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
     { label: 'Customers', count: customerCount, icon: Users, path: '/admin/customers', color: 'blue' },
     { label: 'Invoices', count: invoiceCount, icon: Receipt, path: '/admin/invoices', color: 'amber' },
     { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/quotations', color: 'blue' },
+    { label: 'Inventory', count: inventoryCount, icon: Boxes, path: '/admin/inventory', color: 'amber' },
     { label: 'Analytics', icon: BarChart3, path: '/admin/analytics', color: 'green' },
     { label: 'Emails', icon: Mail, path: '/admin/emails', color: 'green' },
     { label: 'Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },

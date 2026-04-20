@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon, FileText } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
+import { useQuoteCartStore } from '@/stores/quoteCartStore'
 import type { Product } from '@/types'
 
 type ProductForm = Omit<Product, 'id'>
@@ -295,6 +296,20 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
+  const [justQuoted, setJustQuoted] = useState<number | null>(null)
+  const addToQuoteCart = useQuoteCartStore((s) => s.addItem)
+
+  const handleQuote = (product: Product) => {
+    addToQuoteCart({
+      source: 'product',
+      productId: String(product.id),
+      description: product.name,
+      unitPrice: product.price,
+      material: product.category,
+    })
+    setJustQuoted(product.id)
+    setTimeout(() => setJustQuoted(null), 1500)
+  }
 
   const handleDelete = (id: number) => {
     if (confirmDelete === id) {
@@ -373,6 +388,17 @@ export default function AdminProducts() {
                 <td className="px-4 py-3 font-accent text-sm text-accent-amber">€{product.price}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => handleQuote(product)}
+                      className={`p-1.5 rounded transition-all ${
+                        justQuoted === product.id
+                          ? 'bg-accent-green/20 text-accent-green'
+                          : 'hover:bg-bg-tertiary text-text-muted hover:text-accent-amber'
+                      }`}
+                      title="Add to quote cart"
+                    >
+                      {justQuoted === product.id ? <span className="text-[10px] font-mono px-1">+1</span> : <FileText size={14} />}
+                    </button>
                     <button
                       onClick={() => setEditing(product.id)}
                       className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-accent-amber transition-all"

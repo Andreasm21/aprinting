@@ -32,6 +32,13 @@ const AdminEmails = lazy(() => import('@/admin/AdminEmails'))
 const AdminAnalytics = lazy(() => import('@/admin/AdminAnalytics'))
 const AdminCustomerProfile = lazy(() => import('@/admin/AdminCustomerProfile'))
 
+// Inventory management
+const InventoryDashboard = lazy(() => import('@/admin/inventory/InventoryDashboard'))
+const InventoryProducts = lazy(() => import('@/admin/inventory/InventoryProducts'))
+const InventoryMovements = lazy(() => import('@/admin/inventory/InventoryMovements'))
+const InventoryScan = lazy(() => import('@/admin/inventory/InventoryScan'))
+const InventoryReports = lazy(() => import('@/admin/inventory/InventoryReports'))
+
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
 const PortalDashboard = lazy(() => import('@/portal/PortalDashboard'))
@@ -90,6 +97,13 @@ function App() {
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
         <Route path="/admin/customers/:id" element={<AdminLoader><AdminCustomerProfile /></AdminLoader>} />
+
+        {/* Inventory */}
+        <Route path="/admin/inventory" element={<AdminLoader><InventoryDashboard /></AdminLoader>} />
+        <Route path="/admin/inventory/products" element={<AdminLoader><InventoryProducts /></AdminLoader>} />
+        <Route path="/admin/inventory/movements" element={<AdminLoader><InventoryMovements /></AdminLoader>} />
+        <Route path="/admin/inventory/scan" element={<AdminLoader><InventoryScan /></AdminLoader>} />
+        <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />

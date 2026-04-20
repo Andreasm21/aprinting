@@ -43,6 +43,8 @@ export interface Invoice {
   deliveryFee: number
   discountPercent: number
   discountAmount: number
+  extraCharge?: number
+  extraChargeNote?: string
   total: number
   paymentTerms?: string
   notes?: string
@@ -187,12 +189,12 @@ async function fetchFromSupabase(): Promise<void> {
 // Shared logic
 // ---------------------------------------------------------------------------
 
-function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number) {
+function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number, extraCharge = 0) {
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
   const discountAmount = subtotal * (discountPercent / 100)
   const afterDiscount = subtotal - discountAmount
   const vatAmount = afterDiscount * vatRate
-  const total = afterDiscount + vatAmount + deliveryFee
+  const total = afterDiscount + vatAmount + deliveryFee + extraCharge
   return { subtotal, discountAmount, vatAmount, total }
 }
 

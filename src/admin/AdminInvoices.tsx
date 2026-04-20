@@ -13,12 +13,12 @@ const STATUS_COLORS: Record<DocumentStatus, string> = {
   cancelled: 'text-red-400 border-red-400/30 bg-red-400/5',
 }
 
-function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number) {
+function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number, extraCharge = 0) {
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
   const discountAmount = subtotal * (discountPercent / 100)
   const afterDiscount = subtotal - discountAmount
   const vatAmount = afterDiscount * vatRate
-  const total = afterDiscount + vatAmount + deliveryFee
+  const total = afterDiscount + vatAmount + deliveryFee + extraCharge
   return { subtotal, discountAmount, vatAmount, total }
 }
 
@@ -264,12 +264,14 @@ function InvoiceEditor({
     lineItems: initial?.lineItems || [{ description: '', unitPrice: 0, quantity: 1, total: 0 }] as InvoiceLineItem[],
     deliveryFee: initial?.deliveryFee ?? 0,
     discountPercent: initial?.discountPercent ?? 0,
+    extraCharge: initial?.extraCharge ?? 0,
+    extraChargeNote: initial?.extraChargeNote || '',
     paymentTerms: initial?.paymentTerms || 'immediate',
     notes: initial?.notes || '',
     status: initial?.status || 'draft' as DocumentStatus,
   })
 
-  const totals = calcTotals(form.lineItems, form.deliveryFee, CYPRUS_VAT_RATE, form.discountPercent)
+  const totals = calcTotals(form.lineItems, form.deliveryFee, CYPRUS_VAT_RATE, form.discountPercent, form.extraCharge)
 
   const handleCustomerSelect = (customer: Customer | null) => {
     if (!customer) {
@@ -313,6 +315,8 @@ function InvoiceEditor({
       deliveryFee: form.deliveryFee,
       discountPercent: form.discountPercent,
       discountAmount: totals.discountAmount,
+      extraCharge: form.extraCharge > 0 ? form.extraCharge : undefined,
+      extraChargeNote: form.extraCharge > 0 && form.extraChargeNote.trim() ? form.extraChargeNote.trim() : undefined,
       total: totals.total,
       paymentTerms: form.paymentTerms,
       notes: form.notes || undefined,
@@ -411,6 +415,18 @@ function InvoiceEditor({
             </div>
           </div>
 
+          {/* Extra Charge */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Extra Charge (€)</label>
+              <input type="number" step="0.01" min={0} value={form.extraCharge} onChange={(e) => setForm({ ...form, extraCharge: parseFloat(e.target.value) || 0 })} className="input-field text-sm" />
+            </div>
+            <div className="col-span-2">
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Extra Charge Note</label>
+              <input type="text" value={form.extraChargeNote} onChange={(e) => setForm({ ...form, extraChargeNote: e.target.value })} placeholder="e.g. rush fee, handling, custom service" className="input-field text-sm" />
+            </div>
+          </div>
+
           {/* Totals Summary */}
           <div className="bg-bg-tertiary rounded-lg p-4 space-y-1.5 text-sm font-mono">
             <div className="flex justify-between text-text-secondary">
@@ -431,6 +447,12 @@ function InvoiceEditor({
               <div className="flex justify-between text-text-secondary">
                 <span>Delivery</span>
                 <span>€{form.deliveryFee.toFixed(2)}</span>
+              </div>
+            )}
+            {form.extraCharge > 0 && (
+              <div className="flex justify-between text-text-secondary">
+                <span>Extra{form.extraChargeNote ? ` (${form.extraChargeNote})` : ''}</span>
+                <span>€{form.extraCharge.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-border text-text-primary font-bold text-base">

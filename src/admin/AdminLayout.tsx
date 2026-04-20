@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BarChart3, Lock, LogOut } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BarChart3, Lock, LogOut, Boxes } from 'lucide-react'
+import QuoteCart from './components/QuoteCart'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/admin/quotations', label: 'Quotations', icon: FileText },
   { path: '/admin/emails', label: 'Emails', icon: Mail },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { path: '/admin/products', label: 'Products', icon: Package },
   { path: '/admin/hero', label: 'Hero Section', icon: FileText },
   { path: '/admin/services', label: 'Services', icon: FileText },
@@ -216,6 +218,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </div>
       </main>
+
+      {/* Global quote cart */}
+      <QuoteCart />
     </div>
   )
 }

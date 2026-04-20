@@ -116,6 +116,12 @@ export default function DocumentPreview({ doc, onClose }: Props) {
                   <span>{doc.deliveryFee.toFixed(2)}</span>
                 </div>
               )}
+              {doc.extraCharge && doc.extraCharge > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{doc.extraChargeNote || 'Extra'}</span>
+                  <span>{doc.extraCharge.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t-2 font-bold text-base" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
                 <span>Total (EUR)</span>
                 <span>{doc.total.toFixed(2)}</span>
