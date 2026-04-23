@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, Edit3, Trash2, Package, QrCode, FileText } from 'lucide-react'
+import { Plus, Search, Edit3, Trash2, Package, QrCode, FileText, X, AlertTriangle } from 'lucide-react'
 import { useInventoryStore, CATEGORIES, type InventoryProduct, type InventoryCategory, type StockStatus } from '@/stores/inventoryStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 import InventoryLayout from './InventoryLayout'
@@ -25,7 +25,9 @@ export default function InventoryProducts() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<InventoryProduct | null>(null)
   const [labeling, setLabeling] = useState<InventoryProduct | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; label: string } | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [justQuoted, setJustQuoted] = useState<string | null>(null)
   const addToQuoteCart = useQuoteCartStore((s) => s.addItem)
 
@@ -57,26 +59,68 @@ export default function InventoryProducts() {
     })
   }, [products, search, category])
 
-  const handleDelete = (id: string) => {
-    if (confirmDelete === id) {
-      deleteProduct(id)
-      setConfirmDelete(null)
+  const requestDelete = (id: string) => {
+    const p = products.find((x) => x.id === id)
+    if (!p) return
+    setDeleteTarget({ ids: [id], label: `${p.partNumber} — ${p.name}` })
+    setDeleteConfirmText('')
+  }
+
+  const requestBulkDelete = () => {
+    if (selectedIds.size === 0) return
+    setDeleteTarget({ ids: Array.from(selectedIds), label: `${selectedIds.size} selected product${selectedIds.size > 1 ? 's' : ''}` })
+    setDeleteConfirmText('')
+  }
+
+  const confirmDeletion = () => {
+    if (!deleteTarget) return
+    if (deleteConfirmText.trim().toLowerCase() !== 'delete') return
+    for (const id of deleteTarget.ids) deleteProduct(id)
+    setDeleteTarget(null)
+    setDeleteConfirmText('')
+    setSelectedIds(new Set())
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
     } else {
-      setConfirmDelete(id)
-      setTimeout(() => setConfirmDelete(null), 3000)
+      setSelectedIds(new Set(filtered.map((p) => p.id)))
     }
   }
 
   return (
     <InventoryLayout>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-text-secondary text-sm">{filtered.length} product{filtered.length !== 1 ? 's' : ''}</p>
-        <button
-          onClick={() => setAdding(true)}
-          className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5"
-        >
-          <Plus size={14} /> Add Product
-        </button>
+        <p className="text-text-secondary text-sm">
+          {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+          {selectedIds.size > 0 && <span className="ml-2 text-accent-amber">· {selectedIds.size} selected</span>}
+        </p>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={requestBulkDelete}
+              className="text-xs font-mono py-2 px-4 rounded-lg border border-red-400 text-red-400 hover:bg-red-400/10 flex items-center gap-1.5"
+            >
+              <Trash2 size={13} /> Delete {selectedIds.size}
+            </button>
+          )}
+          <button
+            onClick={() => setAdding(true)}
+            className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Add Product
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -124,6 +168,14 @@ export default function InventoryProducts() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
+                <th className="p-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={toggleSelectAll}
+                    className="accent-accent-amber"
+                  />
+                </th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Part #</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Name</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Cat</th>
@@ -139,7 +191,15 @@ export default function InventoryProducts() {
                 const qty = getQtyOnHand(p.id)
                 const status = getStockStatus(p.id)
                 return (
-                  <tr key={p.id} className="border-b border-border last:border-0 hover:bg-bg-tertiary/50">
+                  <tr key={p.id} className={`border-b border-border last:border-0 hover:bg-bg-tertiary/50 ${selectedIds.has(p.id) ? 'bg-accent-amber/5' : ''}`}>
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                        className="accent-accent-amber"
+                      />
+                    </td>
                     <td className="p-3 font-mono text-xs text-accent-amber whitespace-nowrap">{p.partNumber}</td>
                     <td className="p-3">
                       <div className="text-text-primary text-sm truncate max-w-[280px]">{p.name}</div>
@@ -182,9 +242,9 @@ export default function InventoryProducts() {
                           <Edit3 size={14} />
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
-                          className={`p-1.5 rounded ${confirmDelete === p.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
-                          title={confirmDelete === p.id ? 'Click again to confirm' : 'Delete'}
+                          onClick={() => requestDelete(p.id)}
+                          className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
+                          title="Delete"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -216,6 +276,62 @@ export default function InventoryProducts() {
       )}
 
       {labeling && <InventoryLabelModal product={labeling} onClose={() => setLabeling(null)} />}
+
+      {/* Delete confirmation — requires typing "delete" */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-bg-secondary border border-red-400/30 rounded-lg max-w-md w-full p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-red-400/10 flex items-center justify-center">
+                  <AlertTriangle size={18} className="text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-mono text-base font-bold text-text-primary">Confirm Delete</h3>
+                  <p className="text-text-muted text-xs font-mono">This action cannot be undone</p>
+                </div>
+              </div>
+              <button onClick={() => { setDeleteTarget(null); setDeleteConfirmText('') }} className="p-1 hover:bg-bg-tertiary rounded">
+                <X size={18} className="text-text-muted" />
+              </button>
+            </div>
+
+            <div className="bg-bg-tertiary rounded-lg p-3 mb-4 border-l-2 border-red-400">
+              <p className="text-text-secondary text-sm">You are about to permanently delete:</p>
+              <p className="font-mono text-sm text-text-primary mt-1 break-words">{deleteTarget.label}</p>
+            </div>
+
+            <label className="block font-mono text-xs text-text-muted uppercase mb-1.5">
+              Type <span className="text-red-400 font-bold">delete</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && deleteConfirmText.trim().toLowerCase() === 'delete') confirmDeletion() }}
+              placeholder="delete"
+              autoFocus
+              className="input-field text-sm font-mono mb-4"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteConfirmText('') }}
+                className="btn-outline flex-1 text-sm py-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeletion}
+                disabled={deleteConfirmText.trim().toLowerCase() !== 'delete'}
+                className="flex-1 bg-red-400 text-bg-primary font-mono font-bold py-2 rounded-lg hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-sm"
+              >
+                <Trash2 size={14} /> Delete {deleteTarget.ids.length > 1 ? `(${deleteTarget.ids.length})` : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </InventoryLayout>
   )
 }
