@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, Check, User, Building2, Shield, Copy, RefreshCw } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Check, User, Building2, Shield, Copy, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
 import bcrypt from 'bcryptjs'
 import type { Customer, AccountType, PaymentTerms, DiscountTier } from '@/stores/customersStore'
 
@@ -58,6 +58,8 @@ export default function CustomerFormModal({
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [passwordHash, setPasswordHash] = useState(initial.passwordHash || '')
   const [copied, setCopied] = useState(false)
+  const [showVatWarning, setShowVatWarning] = useState(false)
+  const vatInputRef = useRef<HTMLInputElement>(null)
 
   const generatePassword = async () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
@@ -84,15 +86,7 @@ export default function CustomerFormModal({
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Warn if business account has no VAT number
-    if (form.accountType === 'business' && form.company.trim() && !form.vatNumber.trim()) {
-      const ok = confirm(
-        `⚠️ Business "${form.company}" has no VAT number.\n\nDo you want to continue without it? The customer will be marked as PENDING VAT.`
-      )
-      if (!ok) return
-    }
+  const performSave = () => {
     onSave({
       accountType: form.accountType,
       name: form.name,
@@ -113,6 +107,26 @@ export default function CustomerFormModal({
       portalEnabled,
       passwordHash: passwordHash || undefined,
     })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Warn if business account has no VAT number — show inline modal
+    if (form.accountType === 'business' && form.company.trim() && !form.vatNumber.trim()) {
+      setShowVatWarning(true)
+      return
+    }
+    performSave()
+  }
+
+  const handleVatStay = () => {
+    setShowVatWarning(false)
+    setTimeout(() => vatInputRef.current?.focus(), 100)
+  }
+
+  const handleVatLater = () => {
+    setShowVatWarning(false)
+    performSave()
   }
 
   return (
@@ -183,7 +197,7 @@ export default function CustomerFormModal({
               <label className="block font-mono text-xs text-text-muted uppercase mb-1">
                 VAT Number {isBusiness && <span className="text-accent-amber">*</span>}
               </label>
-              <input value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} className="input-field" placeholder="CY12345678X" required={isBusiness} />
+              <input ref={vatInputRef} value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} className="input-field" placeholder="CY12345678X" />
             </div>
           </div>
 
@@ -335,6 +349,47 @@ export default function CustomerFormModal({
           </div>
         </form>
       </div>
+
+      {/* VAT Warning Modal — appears when business has no VAT number */}
+      {showVatWarning && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-bg-secondary border border-accent-amber/40 rounded-lg max-w-md w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-accent-amber/10 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-accent-amber" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-mono text-base font-bold text-text-primary mb-1">VAT Number Required</h3>
+                <p className="text-text-secondary text-sm">
+                  A VAT number is <span className="text-accent-amber font-bold">mandatory</span> for business accounts.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-bg-tertiary rounded-lg p-3 mb-5 border-l-2 border-accent-amber">
+              <p className="text-text-secondary text-xs">
+                <span className="font-mono text-text-primary">{form.company || 'This business'}</span> has no VAT number.
+                You can add it now, or save without it — the account will be flagged as <span className="font-mono text-accent-amber">PENDING VAT</span> until you add it later.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleVatLater}
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-mono py-2.5 px-4 rounded-lg border border-border text-text-muted hover:text-text-secondary"
+              >
+                <Clock size={14} /> Do It Later
+              </button>
+              <button
+                onClick={handleVatStay}
+                className="btn-amber flex-1 text-sm py-2.5 px-4 flex items-center justify-center gap-1.5"
+              >
+                <Check size={14} /> Stay & Add VAT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
