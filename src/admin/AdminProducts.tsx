@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon, FileText, Boxes } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
+import { useInventoryStore, type InventoryCategory } from '@/stores/inventoryStore'
 import type { Product } from '@/types'
 
 type ProductForm = Omit<Product, 'id'>
@@ -297,7 +298,56 @@ export default function AdminProducts() {
   const [adding, setAdding] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
   const [justQuoted, setJustQuoted] = useState<number | null>(null)
+  const [justAddedToInv, setJustAddedToInv] = useState<number | null>(null)
   const addToQuoteCart = useQuoteCartStore((s) => s.addItem)
+  const inventoryProducts = useInventoryStore((s) => s.products)
+  const addInventoryProduct = useInventoryStore((s) => s.addProduct)
+
+  // Map storefront category to inventory category
+  const mapToInventoryCategory = (product: Product): InventoryCategory => {
+    const m = product.material.toUpperCase()
+    if (m === 'PLA') return 'PLA'
+    if (m === 'PETG') return 'PETG'
+    if (m === 'ABS') return 'ABS'
+    if (m === 'TPU') return 'TPU'
+    if (m === 'NYLON') return 'Nylon'
+    if (m === 'RESIN') return 'Resin'
+    if (product.category === 'accessories') return 'Hardware'
+    return 'Finished'
+  }
+
+  // Auto-generate next barcode (numeric, EAN-13-ish)
+  const generateBarcode = () => {
+    const allBarcodes = inventoryProducts.map((p) => p.barcode).filter((b): b is string => !!b && /^\d+$/.test(b))
+    const nums = allBarcodes.map((b) => parseInt(b))
+    const max = nums.length > 0 ? Math.max(...nums) : 4710881830100
+    return String(max + 1).padStart(13, '0')
+  }
+
+  const handleAddToInventory = (product: Product) => {
+    const partNumber = `AXM-PROD-${String(product.id).padStart(3, '0')}`
+    // Check if already in inventory
+    const existing = inventoryProducts.find((p) => p.partNumber === partNumber)
+    if (existing) {
+      alert(`Already in inventory as ${existing.partNumber}`)
+      return
+    }
+    addInventoryProduct({
+      partNumber,
+      name: product.name,
+      category: mapToInventoryCategory(product),
+      brand: 'Axiom',
+      cost: Math.round((product.price / 2) * 100) / 100, // estimate
+      price: product.price,
+      reorderLevel: 5,
+      bin: 'STORE-A-1',
+      barcode: generateBarcode(),
+      supplier: 'In-house',
+      archived: false,
+    })
+    setJustAddedToInv(product.id)
+    setTimeout(() => setJustAddedToInv(null), 1500)
+  }
 
   const handleQuote = (product: Product) => {
     addToQuoteCart({
@@ -388,6 +438,17 @@ export default function AdminProducts() {
                 <td className="px-4 py-3 font-accent text-sm text-accent-amber">€{product.price}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => handleAddToInventory(product)}
+                      className={`p-1.5 rounded transition-all ${
+                        justAddedToInv === product.id
+                          ? 'bg-accent-green/20 text-accent-green'
+                          : 'hover:bg-bg-tertiary text-text-muted hover:text-accent-blue'
+                      }`}
+                      title="Add to inventory (with auto-barcode)"
+                    >
+                      {justAddedToInv === product.id ? <Check size={14} /> : <Boxes size={14} />}
+                    </button>
                     <button
                       onClick={() => handleQuote(product)}
                       className={`p-1.5 rounded transition-all ${

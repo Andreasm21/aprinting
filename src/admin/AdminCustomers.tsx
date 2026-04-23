@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Plus, Pencil, Trash2, Search,
   Mail, Phone, MapPin, Building2, FileText, ShoppingCart,
-  ChevronDown, ChevronUp, Tag, User, ExternalLink
+  ChevronDown, ChevronUp, Tag, User, ExternalLink, AlertTriangle
 } from 'lucide-react'
 import { useCustomersStore, type Customer, type AccountType } from '@/stores/customersStore'
 import CustomerFormModal from './components/CustomerFormModal'
@@ -60,6 +60,14 @@ function CustomerRow({ customer }: { customer: Customer }) {
                 <p className="font-mono text-sm text-text-primary">{customer.name}</p>
                 {customer.accountType === 'business' && (
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-blue/10 text-accent-blue border border-accent-blue/20">B2B</span>
+                )}
+                {customer.accountType === 'business' && customer.company && !customer.vatNumber && (
+                  <span
+                    title="Pending VAT number"
+                    className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-amber/10 text-accent-amber border border-accent-amber/30"
+                  >
+                    <AlertTriangle size={10} /> NO VAT
+                  </span>
                 )}
               </div>
               <p className="text-text-muted text-xs">{customer.email}</p>

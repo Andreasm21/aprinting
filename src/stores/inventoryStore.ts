@@ -4,6 +4,32 @@ import { useAuditLogStore } from './auditLogStore'
 
 const PRODUCTS_KEY = 'axiom_inventory_products'
 const MOVEMENTS_KEY = 'axiom_stock_movements'
+const SEEDED_FLAG_KEY = 'axiom_inventory_seeded'
+const TOMBSTONES_KEY = 'axiom_inventory_tombstones'
+
+// ─────────────────── Tombstone tracking (prevents deletes from being re-fetched) ───────────────────
+
+interface Tombstone { id: string; deletedAt: number }
+const TOMBSTONE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+function loadTombstones(): Tombstone[] {
+  try {
+    const raw = localStorage.getItem(TOMBSTONES_KEY)
+    if (!raw) return []
+    const items: Tombstone[] = JSON.parse(raw)
+    // Cleanup expired
+    const now = Date.now()
+    return items.filter((t) => now - t.deletedAt < TOMBSTONE_TTL)
+  } catch { return [] }
+}
+
+function addTombstone(id: string) {
+  const items = loadTombstones()
+  if (!items.find((t) => t.id === id)) {
+    items.push({ id, deletedAt: Date.now() })
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(items))
+  }
+}
 
 export type MovementType = 'IN' | 'OUT' | 'ADJUST'
 export type StockStatus = 'OK' | 'LOW' | 'OUT'
@@ -232,15 +258,28 @@ async function fetchFromSupabase() {
     if (pe) console.error('[inventory] fetch products:', pe)
     if (me) console.error('[inventory] fetch movements:', me)
 
-    const hasProducts = prods && prods.length > 0
-    const hasMovements = moves && moves.length > 0
+    // Filter out tombstoned (deleted) items
+    const tombstonedIds = new Set(loadTombstones().map((t) => t.id))
+    const productsClean = prods ? (prods as SbProduct[]).filter((p) => !tombstonedIds.has(p.id)) : []
+    const movementsClean = moves ? (moves as SbMovement[]).filter((m) => !tombstonedIds.has(m.product_id)) : []
+
+    // Cleanup: try to delete any tombstoned items that still exist remotely
+    if (prods) {
+      for (const p of prods as SbProduct[]) {
+        if (tombstonedIds.has(p.id)) sbDeleteProduct(p.id)
+      }
+    }
+
+    const hasProducts = productsClean.length > 0
+    const hasMovements = movementsClean.length > 0
+    const hasBeenSeeded = localStorage.getItem(SEEDED_FLAG_KEY) === '1'
 
     if (hasProducts) {
-      const products = (prods as SbProduct[]).map(rowToProduct)
+      const products = productsClean.map(rowToProduct)
       saveProducts(products)
       useInventoryStore.setState({ products })
-    } else {
-      // Seed on first load
+    } else if (!hasBeenSeeded) {
+      // Seed only on the very first load (never re-seed after deletions)
       const local = loadProducts()
       if (local.length === 0) {
         console.log('[inventory] Seeding initial inventory data')
@@ -253,6 +292,7 @@ async function fetchFromSupabase() {
         saveMovements(seededMovements)
         useInventoryStore.setState({ movements: seededMovements })
         for (const m of seededMovements) sbInsertMovement(m)
+        localStorage.setItem(SEEDED_FLAG_KEY, '1')
         return
       } else {
         for (const p of local) sbUpsertProduct(p)
@@ -260,7 +300,7 @@ async function fetchFromSupabase() {
     }
 
     if (hasMovements) {
-      const movements = (moves as SbMovement[]).map(rowToMovement)
+      const movements = movementsClean.map(rowToMovement)
       saveMovements(movements)
       useInventoryStore.setState({ movements })
     } else {
@@ -401,6 +441,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
     deleteProduct: (id) => {
       const p = get().products.find((x) => x.id === id)
       if (p) useAuditLogStore.getState().log('delete', 'product', `Inventory: "${p.partNumber}" deleted`)
+      // Add tombstone first so even if Supabase delete is slow, the item won't reappear on refresh
+      addTombstone(id)
       set((state) => {
         const products = state.products.filter((x) => x.id !== id)
         saveProducts(products)

@@ -86,6 +86,13 @@ export default function CustomerFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Warn if business account has no VAT number
+    if (form.accountType === 'business' && form.company.trim() && !form.vatNumber.trim()) {
+      const ok = confirm(
+        `⚠️ Business "${form.company}" has no VAT number.\n\nDo you want to continue without it? The customer will be marked as PENDING VAT.`
+      )
+      if (!ok) return
+    }
     onSave({
       accountType: form.accountType,
       name: form.name,

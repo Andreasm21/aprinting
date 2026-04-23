@@ -1,4 +1,5 @@
-import { X, Printer } from 'lucide-react'
+import { useState } from 'react'
+import { X, Printer, Download } from 'lucide-react'
 import type { Invoice } from '@/stores/invoicesStore'
 import { useContentStore } from '@/stores/contentStore'
 
@@ -10,9 +11,71 @@ interface Props {
 export default function DocumentPreview({ doc, onClose }: Props) {
   const contact = useContentStore((s) => s.content.contact)
   const isQuote = doc.type === 'quotation'
+  const [downloading, setDownloading] = useState(false)
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDownloadPDF = async () => {
+    setDownloading(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+
+      const element = document.getElementById('printable-document')
+      if (!element) {
+        setDownloading(false)
+        return
+      }
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      // A4 dimensions in mm
+      const pdfWidth = 210
+      const pdfHeight = 297
+      const imgWidth = pdfWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+
+      if (imgHeight <= pdfHeight) {
+        // Fits on one page
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+      } else {
+        // Multi-page split
+        let heightLeft = imgHeight
+        let position = 0
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pdfHeight
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight
+          pdf.addPage()
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+          heightLeft -= pdfHeight
+        }
+      }
+
+      pdf.save(`${doc.documentNumber}.pdf`)
+    } catch (err) {
+      console.error('[pdf] export error:', err)
+      alert('Failed to generate PDF. Try the Print option instead.')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -22,8 +85,15 @@ export default function DocumentPreview({ doc, onClose }: Props) {
         <div className="flex items-center justify-between p-4 border-b print:hidden">
           <h2 className="font-mono text-sm font-bold text-gray-800">Preview — {doc.documentNumber}</h2>
           <div className="flex gap-2">
-            <button onClick={handlePrint} className="flex items-center gap-1.5 text-xs font-mono bg-amber-500 text-white px-3 py-1.5 rounded hover:bg-amber-600">
-              <Printer size={13} /> Print / PDF
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="flex items-center gap-1.5 text-xs font-mono bg-amber-500 text-white px-3 py-1.5 rounded hover:bg-amber-600 disabled:opacity-50"
+            >
+              <Download size={13} /> {downloading ? 'Generating...' : 'Download PDF'}
+            </button>
+            <button onClick={handlePrint} className="flex items-center gap-1.5 text-xs font-mono bg-gray-200 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-300">
+              <Printer size={13} /> Print
             </button>
             <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
               <X size={18} className="text-gray-500" />

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Building2, Tag, Receipt,
   FileText, Edit3, Plus, Eye, Clock, User, ShoppingCart,
   StickyNote, PhoneCall, MailOpen, Handshake, Trash2, Check,
-  CreditCard, CalendarDays, TrendingUp, Package
+  CreditCard, CalendarDays, TrendingUp, Package, AlertTriangle
 } from 'lucide-react'
 import { useCustomersStore, DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
 import { useInvoicesStore, type Invoice, type DocumentStatus } from '@/stores/invoicesStore'
@@ -568,6 +568,14 @@ export default function AdminCustomerProfile() {
               }`}>
                 {customer.accountType}
               </span>
+              {customer.accountType === 'business' && customer.company && !customer.vatNumber && (
+                <span
+                  title="Pending VAT number"
+                  className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-accent-amber/10 text-accent-amber border border-accent-amber/30"
+                >
+                  <AlertTriangle size={10} /> NO VAT
+                </span>
+              )}
             </div>
             {customer.company && (
               <p className="text-text-secondary text-sm flex items-center gap-1.5 mt-0.5">
