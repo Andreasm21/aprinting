@@ -13,8 +13,17 @@ export interface AdminUser {
   displayName: string
   email?: string
   passwordHash: string
+  mustChangePassword?: boolean
   createdAt: string
   lastLoginAt?: string
+}
+
+// Generate a memorable but secure random password (10 chars, no ambiguous letters)
+export function generateRandomPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  let pw = ''
+  for (let i = 0; i < 10; i++) pw += chars[Math.floor(Math.random() * chars.length)]
+  return pw
 }
 
 interface AdminAuthState {
@@ -25,9 +34,10 @@ interface AdminAuthState {
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   restoreSession: () => Promise<void>
-  addAdmin: (data: { username: string; displayName: string; email?: string; password: string }) => Promise<{ success: boolean; error?: string }>
+  addAdmin: (data: { username: string; displayName: string; email?: string; password?: string }) => Promise<{ success: boolean; error?: string; generatedPassword?: string }>
   updateAdmin: (id: string, updates: { displayName?: string; email?: string }) => Promise<void>
-  changePassword: (id: string, newPassword: string) => Promise<void>
+  changePassword: (id: string, newPassword: string, clearMustChange?: boolean) => Promise<void>
+  resetPassword: (id: string) => Promise<{ success: boolean; password?: string }>
   deleteAdmin: (id: string) => { success: boolean; error?: string }
 }
 
@@ -53,6 +63,7 @@ interface SbRow {
   display_name: string
   email: string | null
   password_hash: string
+  must_change_password: boolean | null
   created_at: string
   last_login_at: string | null
 }
@@ -64,6 +75,7 @@ function toRow(u: AdminUser): SbRow {
     display_name: u.displayName,
     email: u.email ?? null,
     password_hash: u.passwordHash,
+    must_change_password: u.mustChangePassword ?? false,
     created_at: u.createdAt,
     last_login_at: u.lastLoginAt ?? null,
   }
@@ -76,6 +88,7 @@ function fromRow(r: SbRow): AdminUser {
     displayName: r.display_name,
     email: r.email ?? undefined,
     passwordHash: r.password_hash,
+    mustChangePassword: r.must_change_password ?? false,
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at ?? undefined,
   }
@@ -207,17 +220,21 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
   addAdmin: async ({ username, displayName, email, password }) => {
     const trimmed = username.trim().toLowerCase()
     if (trimmed.length < 3) return { success: false, error: 'Username must be at least 3 characters' }
-    if (password.length < 6) return { success: false, error: 'Password must be at least 6 characters' }
     if (get().users.find((u) => u.username.toLowerCase() === trimmed)) {
       return { success: false, error: 'Username already taken' }
     }
-    const hash = await bcrypt.hash(password, 10)
+    // Auto-generate password if none provided
+    const finalPassword = password && password.length > 0 ? password : generateRandomPassword()
+    if (finalPassword.length < 6) return { success: false, error: 'Password must be at least 6 characters' }
+    const hash = await bcrypt.hash(finalPassword, 10)
     const user: AdminUser = {
       id: `admin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       username: trimmed,
       displayName: displayName.trim(),
       email: email?.trim() || undefined,
       passwordHash: hash,
+      // Force password change on first login (always for new accounts)
+      mustChangePassword: true,
       createdAt: new Date().toISOString(),
     }
     set((state) => {
@@ -226,7 +243,7 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
       return { users }
     })
     sbUpsert(user)
-    return { success: true }
+    return { success: true, generatedPassword: finalPassword }
   },
 
   updateAdmin: async (id, updates) => {
@@ -247,19 +264,37 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
     if (updated) sbUpsert(updated)
   },
 
-  changePassword: async (id, newPassword) => {
+  changePassword: async (id, newPassword, clearMustChange = false) => {
     const hash = await bcrypt.hash(newPassword, 10)
     let updated: AdminUser | undefined
     set((state) => {
       const users = state.users.map((u) => {
         if (u.id !== id) return u
-        updated = { ...u, passwordHash: hash }
+        updated = { ...u, passwordHash: hash, mustChangePassword: clearMustChange ? false : u.mustChangePassword }
         return updated
       })
       save(users)
       return { users, currentUser: state.currentUser?.id === id ? (updated || state.currentUser) : state.currentUser }
     })
     if (updated) sbUpsert(updated)
+  },
+
+  resetPassword: async (id) => {
+    // Admin generates a new random password for an existing admin and forces a change
+    const newPw = generateRandomPassword()
+    const hash = await bcrypt.hash(newPw, 10)
+    let updated: AdminUser | undefined
+    set((state) => {
+      const users = state.users.map((u) => {
+        if (u.id !== id) return u
+        updated = { ...u, passwordHash: hash, mustChangePassword: true }
+        return updated
+      })
+      save(users)
+      return { users, currentUser: state.currentUser?.id === id ? (updated || state.currentUser) : state.currentUser }
+    })
+    if (updated) sbUpsert(updated)
+    return { success: true, password: newPw }
   },
 
   deleteAdmin: (id) => {

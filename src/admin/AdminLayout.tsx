@@ -6,6 +6,7 @@ import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
 import { useAuditLogStore } from '@/stores/auditLogStore'
+import bcrypt from 'bcryptjs'
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,12 +39,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const logout = useAdminAuthStore((s) => s.logout)
   const auditLog = useAuditLogStore((s) => s.log)
 
+  const changePassword = useAdminAuthStore((s) => s.changePassword)
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // First-login password change state
+  const [forcedPwOld, setForcedPwOld] = useState('')
+  const [forcedPwNew, setForcedPwNew] = useState('')
+  const [forcedPwConfirm, setForcedPwConfirm] = useState('')
+  const [forcedPwError, setForcedPwError] = useState('')
+  const [forcedPwSubmitting, setForcedPwSubmitting] = useState(false)
 
   // Bootstrap admin users + restore session on mount
   useEffect(() => {
@@ -148,6 +157,105 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-center text-text-muted text-[10px] font-mono mt-4">
             <a href="/" className="hover:text-accent-amber transition-colors">Back to site</a>
           </p>
+        </form>
+      </div>
+    )
+  }
+
+  // Force password change on first login (or after admin reset)
+  if (currentUser.mustChangePassword) {
+    const handleForcedChange = async (e: React.FormEvent) => {
+      e.preventDefault()
+      setForcedPwError('')
+      if (forcedPwNew.length < 6) {
+        setForcedPwError('New password must be at least 6 characters')
+        return
+      }
+      if (forcedPwNew !== forcedPwConfirm) {
+        setForcedPwError('Passwords do not match')
+        return
+      }
+      // Verify the temporary password
+      const valid = await bcrypt.compare(forcedPwOld, currentUser.passwordHash)
+      if (!valid) {
+        setForcedPwError('Current password is incorrect')
+        return
+      }
+      setForcedPwSubmitting(true)
+      await changePassword(currentUser.id, forcedPwNew, true)
+      auditLog('update', 'system', `${currentUser.username} changed their password`)
+      setForcedPwSubmitting(false)
+      setForcedPwOld('')
+      setForcedPwNew('')
+      setForcedPwConfirm('')
+    }
+
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
+        <form onSubmit={handleForcedChange} className="w-full max-w-sm">
+          <div className="card-base p-8">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
+                <Lock size={24} className="text-accent-amber" />
+              </div>
+            </div>
+            <div className="text-center mb-6">
+              <h2 className="font-mono text-base font-bold text-text-primary">Set Your Password</h2>
+              <p className="text-text-muted text-xs font-mono mt-1">
+                Welcome <span className="text-accent-amber">@{currentUser.username}</span> — please change your temporary password to continue.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">Temporary Password</label>
+                <input
+                  type="password"
+                  value={forcedPwOld}
+                  onChange={(e) => { setForcedPwOld(e.target.value); setForcedPwError('') }}
+                  required
+                  autoFocus
+                  className="input-field text-sm font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={forcedPwNew}
+                  onChange={(e) => { setForcedPwNew(e.target.value); setForcedPwError('') }}
+                  required
+                  minLength={6}
+                  className="input-field text-sm font-mono"
+                  placeholder="min 6 characters"
+                />
+              </div>
+              <div>
+                <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={forcedPwConfirm}
+                  onChange={(e) => { setForcedPwConfirm(e.target.value); setForcedPwError('') }}
+                  required
+                  className={`input-field text-sm font-mono ${forcedPwError ? 'border-red-500' : ''}`}
+                />
+                {forcedPwError && <p className="text-red-400 text-xs font-mono mt-1.5">{forcedPwError}</p>}
+              </div>
+              <button
+                type="submit"
+                disabled={forcedPwSubmitting}
+                className="w-full bg-accent-amber text-bg-primary font-mono text-sm font-bold py-2.5 rounded-lg hover:bg-accent-amber/90 transition-colors disabled:opacity-50"
+              >
+                {forcedPwSubmitting ? 'Updating...' : 'Set Password'}
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full text-text-muted text-xs font-mono hover:text-accent-amber"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     )

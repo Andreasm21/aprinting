@@ -76,7 +76,7 @@ export default function AdminInvoices() {
 
   const toggleSelectAll = () => {
     if (selectedIds.size === invoicesList.length) setSelectedIds(new Set())
-    else setSelectedIds(new Set(invoicesList.filter((i) => !i.locked).map((i) => i.id)))
+    else setSelectedIds(new Set(invoicesList.map((i) => i.id)))
   }
 
   const stats = useMemo(() => {
@@ -159,7 +159,7 @@ export default function AdminInvoices() {
                 <th className="p-3 w-8">
                   <input
                     type="checkbox"
-                    checked={invoicesList.length > 0 && selectedIds.size === invoicesList.filter((i) => !i.locked).length}
+                    checked={invoicesList.length > 0 && selectedIds.size === invoicesList.length}
                     onChange={toggleSelectAll}
                     className="accent-accent-amber"
                   />
@@ -176,14 +176,12 @@ export default function AdminInvoices() {
               {invoicesList.map((inv) => (
                 <tr key={inv.id} className={`border-b border-border last:border-0 hover:bg-bg-tertiary/50 transition-colors ${selectedIds.has(inv.id) ? 'bg-accent-amber/5' : ''}`}>
                   <td className="p-3">
-                    {!inv.locked && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(inv.id)}
-                        onChange={() => toggleSelect(inv.id)}
-                        className="accent-accent-amber"
-                      />
-                    )}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(inv.id)}
+                      onChange={() => toggleSelect(inv.id)}
+                      className="accent-accent-amber"
+                    />
                   </td>
                   <td className="p-3 font-mono text-xs text-accent-amber">{inv.documentNumber}</td>
                   <td className="p-3">
@@ -217,19 +215,17 @@ export default function AdminInvoices() {
                         <Eye size={14} />
                       </button>
                       {!inv.locked && (
-                        <>
-                          <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
-                            <Edit3 size={14} />
-                          </button>
-                          <button
-                            onClick={() => requestDelete(inv.id)}
-                            className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
+                        <button onClick={() => setEditing(inv)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-blue" title="Edit">
+                          <Edit3 size={14} />
+                        </button>
                       )}
+                      <button
+                        onClick={() => requestDelete(inv.id)}
+                        className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>

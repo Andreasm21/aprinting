@@ -82,7 +82,7 @@ export default function AdminQuotations() {
 
   const toggleSelectAll = () => {
     if (selectedIds.size === quotesList.length) setSelectedIds(new Set())
-    else setSelectedIds(new Set(quotesList.filter((q) => q.status !== 'paid').map((q) => q.id)))
+    else setSelectedIds(new Set(quotesList.map((q) => q.id)))
   }
 
   const stats = useMemo(() => {
@@ -165,7 +165,7 @@ export default function AdminQuotations() {
                 <th className="p-3 w-8">
                   <input
                     type="checkbox"
-                    checked={quotesList.length > 0 && selectedIds.size === quotesList.filter((q) => q.status !== 'paid').length}
+                    checked={quotesList.length > 0 && selectedIds.size === quotesList.length}
                     onChange={toggleSelectAll}
                     className="accent-accent-amber"
                   />
@@ -183,14 +183,12 @@ export default function AdminQuotations() {
               {quotesList.map((inv) => (
                 <tr key={inv.id} className={`border-b border-border last:border-0 hover:bg-bg-tertiary/50 transition-colors ${selectedIds.has(inv.id) ? 'bg-accent-amber/5' : ''}`}>
                   <td className="p-3">
-                    {inv.status !== 'paid' && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(inv.id)}
-                        onChange={() => toggleSelect(inv.id)}
-                        className="accent-accent-amber"
-                      />
-                    )}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(inv.id)}
+                      onChange={() => toggleSelect(inv.id)}
+                      className="accent-accent-amber"
+                    />
                   </td>
                   <td className="p-3 font-mono text-xs text-accent-blue">{inv.documentNumber}</td>
                   <td className="p-3">
@@ -241,15 +239,15 @@ export default function AdminQuotations() {
                           >
                             <Receipt size={14} />
                           </button>
-                          <button
-                            onClick={() => requestDelete(inv.id)}
-                            className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </>
                       )}
+                      <button
+                        onClick={() => requestDelete(inv.id)}
+                        className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -26,6 +26,7 @@ export default function AdminTeam() {
   const addAdmin = useAdminAuthStore((s) => s.addAdmin)
   const updateAdmin = useAdminAuthStore((s) => s.updateAdmin)
   const changePassword = useAdminAuthStore((s) => s.changePassword)
+  const resetPassword = useAdminAuthStore((s) => s.resetPassword)
   const deleteAdmin = useAdminAuthStore((s) => s.deleteAdmin)
 
   const [adding, setAdding] = useState(false)
@@ -55,13 +56,24 @@ export default function AdminTeam() {
 
   const handleChangePassword = async () => {
     if (!changingPw || newPw.length < 6) return
-    await changePassword(changingPw.id, newPw)
+    // Admin manually setting a new password — also force the user to change it on next login
+    await changePassword(changingPw.id, newPw, false)
     setPwSuccess(true)
     setTimeout(() => {
       setChangingPw(null)
       setNewPw('')
       setPwSuccess(false)
     }, 1500)
+  }
+
+  const handleResetPassword = async (user: AdminUser) => {
+    const result = await resetPassword(user.id)
+    if (result.password) {
+      // Show in the same modal flow
+      setChangingPw(user)
+      setNewPw(result.password)
+      setPwSuccess(true)
+    }
   }
 
   return (
@@ -120,9 +132,9 @@ export default function AdminTeam() {
                   <Edit3 size={14} />
                 </button>
                 <button
-                  onClick={() => { setChangingPw(u); setNewPw(''); setPwSuccess(false) }}
+                  onClick={() => handleResetPassword(u)}
                   className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-accent-amber"
-                  title="Change password"
+                  title="Reset password (auto-generate)"
                 >
                   <Key size={14} />
                 </button>
@@ -171,38 +183,68 @@ export default function AdminTeam() {
       {/* Change password modal */}
       {changingPw && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-bg-secondary border border-border rounded-lg max-w-sm w-full p-5">
+          <div className="bg-bg-secondary border border-accent-amber/30 rounded-lg max-w-sm w-full p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-mono text-base font-bold text-text-primary flex items-center gap-2">
-                <Key size={16} className="text-accent-amber" /> Reset Password
+                <Key size={16} className="text-accent-amber" /> {pwSuccess ? 'New Password Generated' : 'Reset Password'}
               </h3>
-              <button onClick={() => { setChangingPw(null); setNewPw('') }} className="p-1 hover:bg-bg-tertiary rounded">
+              <button onClick={() => { setChangingPw(null); setNewPw(''); setPwSuccess(false) }} className="p-1 hover:bg-bg-tertiary rounded">
                 <X size={16} className="text-text-muted" />
               </button>
             </div>
-            <p className="text-text-secondary text-xs mb-3">
-              New password for <span className="font-mono text-accent-amber">@{changingPw.username}</span>
-            </p>
-            <input
-              type="text"
-              value={newPw}
-              onChange={(e) => setNewPw(e.target.value)}
-              autoFocus
-              className="input-field text-sm font-mono mb-3"
-              placeholder="min 6 characters"
-              minLength={6}
-            />
-            {pwSuccess && <p className="text-accent-green text-xs font-mono mb-2">[ PASSWORD UPDATED ]</p>}
-            <div className="flex gap-2">
-              <button onClick={() => { setChangingPw(null); setNewPw('') }} className="btn-outline flex-1 text-sm py-2">Cancel</button>
-              <button
-                onClick={handleChangePassword}
-                disabled={newPw.length < 6 || pwSuccess}
-                className="btn-amber flex-1 text-sm py-2 disabled:opacity-50"
-              >
-                Update
-              </button>
-            </div>
+            {pwSuccess ? (
+              <>
+                <p className="text-text-secondary text-xs mb-3">
+                  New temporary password for <span className="font-mono text-accent-amber">@{changingPw.username}</span>:
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="text"
+                    readOnly
+                    value={newPw}
+                    className="input-field text-base font-mono font-bold text-accent-amber flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(newPw) }}
+                    className="btn-outline text-xs py-2 px-3"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-accent-amber text-[11px] font-mono mb-3">
+                  Send this to the team member. They'll be required to change it on next login.
+                </p>
+                <button onClick={() => { setChangingPw(null); setNewPw(''); setPwSuccess(false) }} className="btn-amber w-full text-sm py-2">
+                  Done
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-text-secondary text-xs mb-3">
+                  Set a custom password for <span className="font-mono text-accent-amber">@{changingPw.username}</span>:
+                </p>
+                <input
+                  type="text"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  autoFocus
+                  className="input-field text-sm font-mono mb-3"
+                  placeholder="min 6 characters"
+                  minLength={6}
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => { setChangingPw(null); setNewPw('') }} className="btn-outline flex-1 text-sm py-2">Cancel</button>
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={newPw.length < 6}
+                    className="btn-amber flex-1 text-sm py-2 disabled:opacity-50"
+                  >
+                    Update
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
