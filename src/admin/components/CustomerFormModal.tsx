@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
-import { X, Check, User, Building2, Shield, Copy, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
+import { X, Check, User, Building2, Shield, Copy, RefreshCw, AlertTriangle, Clock, Plus, Trash2 } from 'lucide-react'
 import bcrypt from 'bcryptjs'
-import type { Customer, AccountType, PaymentTerms, DiscountTier } from '@/stores/customersStore'
+import type { Customer, AccountType, PaymentTerms, DiscountTier, ExtraContact } from '@/stores/customersStore'
 
 export const TAG_PRESETS = ['VIP', 'B2B', 'Wholesale', 'Recurring', 'Car Parts', 'Prototype', 'New']
 
@@ -53,6 +53,13 @@ export default function CustomerFormModal({
     notes: initial.notes || '',
     tags: initial.tags || [],
   })
+  const [extraContacts, setExtraContacts] = useState<ExtraContact[]>(initial.extraContacts || [])
+
+  const addExtraContact = () => setExtraContacts([...extraContacts, { name: '', email: '', phone: '', role: '' }])
+  const removeExtraContact = (i: number) => setExtraContacts(extraContacts.filter((_, idx) => idx !== i))
+  const updateExtraContact = (i: number, patch: Partial<ExtraContact>) => {
+    setExtraContacts(extraContacts.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
+  }
 
   const [portalEnabled, setPortalEnabled] = useState(initial.portalEnabled || false)
   const [generatedPassword, setGeneratedPassword] = useState('')
@@ -87,6 +94,8 @@ export default function CustomerFormModal({
   }
 
   const performSave = () => {
+    // Strip empty extra contacts (no email)
+    const cleanedExtras = extraContacts.filter((c) => c.email.trim() !== '')
     onSave({
       accountType: form.accountType,
       name: form.name,
@@ -104,6 +113,7 @@ export default function CustomerFormModal({
       discountTier: isBusiness ? form.discountTier : undefined,
       notes: form.notes || undefined,
       tags: form.tags,
+      extraContacts: cleanedExtras.length > 0 ? cleanedExtras : undefined,
       portalEnabled,
       passwordHash: passwordHash || undefined,
     })
@@ -199,6 +209,73 @@ export default function CustomerFormModal({
               </label>
               <input ref={vatInputRef} value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} className="input-field" placeholder="CY12345678X" />
             </div>
+          </div>
+
+          {/* Additional Contacts */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block font-mono text-xs text-text-muted uppercase">
+                Additional Contacts {extraContacts.length > 0 && <span className="text-text-muted/70">({extraContacts.length})</span>}
+              </label>
+              <button
+                type="button"
+                onClick={addExtraContact}
+                className="flex items-center gap-1 text-xs font-mono text-text-secondary hover:text-accent-amber px-2 py-1 rounded border border-border hover:border-accent-amber transition-all"
+              >
+                <Plus size={12} /> Add Contact
+              </button>
+            </div>
+            {extraContacts.length === 0 ? (
+              <p className="text-text-muted text-[11px] font-mono">No additional contacts. Click "Add Contact" to include other people from the company (e.g. accountant, project lead).</p>
+            ) : (
+              <div className="space-y-2">
+                {extraContacts.map((c, i) => (
+                  <div key={i} className="bg-bg-tertiary rounded-lg p-3 space-y-2 border border-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-text-muted uppercase">Contact #{i + 2}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeExtraContact(i)}
+                        className="p-1 rounded text-text-muted hover:text-red-400"
+                        title="Remove"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        value={c.name}
+                        onChange={(e) => updateExtraContact(i, { name: e.target.value })}
+                        placeholder="Name *"
+                        className="input-field text-sm py-1.5"
+                      />
+                      <input
+                        value={c.role || ''}
+                        onChange={(e) => updateExtraContact(i, { role: e.target.value })}
+                        placeholder="Role (e.g. Accountant)"
+                        className="input-field text-sm py-1.5"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="email"
+                        value={c.email}
+                        onChange={(e) => updateExtraContact(i, { email: e.target.value })}
+                        placeholder="Email *"
+                        className="input-field text-sm py-1.5"
+                      />
+                      <input
+                        type="tel"
+                        value={c.phone || ''}
+                        onChange={(e) => updateExtraContact(i, { phone: e.target.value })}
+                        placeholder="Phone"
+                        className="input-field text-sm py-1.5"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Delivery Address */}

@@ -30,6 +30,7 @@ export interface AuditEntry {
   label: string
   detail: string
   metadata: Record<string, unknown>
+  actor?: string
   createdAt: string
 }
 
@@ -63,15 +64,34 @@ interface SbRow {
   label: string
   detail: string
   metadata: Record<string, unknown>
+  actor: string | null
   created_at: string
 }
 
 function toRow(e: AuditEntry): SbRow {
-  return { id: e.id, action: e.action, category: e.category, label: e.label, detail: e.detail, metadata: e.metadata, created_at: e.createdAt }
+  return {
+    id: e.id,
+    action: e.action,
+    category: e.category,
+    label: e.label,
+    detail: e.detail,
+    metadata: e.metadata,
+    actor: e.actor ?? null,
+    created_at: e.createdAt,
+  }
 }
 
 function fromRow(r: SbRow): AuditEntry {
-  return { id: r.id, action: r.action as AuditAction, category: r.category as AuditCategory, label: r.label, detail: r.detail || '', metadata: r.metadata || {}, createdAt: new Date(r.created_at).toISOString() }
+  return {
+    id: r.id,
+    action: r.action as AuditAction,
+    category: r.category as AuditCategory,
+    label: r.label,
+    detail: r.detail || '',
+    metadata: r.metadata || {},
+    actor: r.actor ?? undefined,
+    createdAt: new Date(r.created_at).toISOString(),
+  }
 }
 
 async function sbInsert(entry: AuditEntry) {
@@ -118,6 +138,13 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => {
     entries: load(),
 
     log: (action, category, label, detail = '', metadata = {}) => {
+      // Lazily import to avoid circular dep
+      let actor: string | undefined
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const adminAuth = (window as unknown as { __axiomAdminAuth?: { username?: string } }).__axiomAdminAuth
+        actor = adminAuth?.username
+      } catch { /* ignore */ }
       const entry: AuditEntry = {
         id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         action,
@@ -125,6 +152,7 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => {
         label,
         detail,
         metadata,
+        actor,
         createdAt: new Date().toISOString(),
       }
       set((state) => {

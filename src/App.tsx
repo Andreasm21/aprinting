@@ -31,6 +31,8 @@ const AdminQuotations = lazy(() => import('@/admin/AdminQuotations'))
 const AdminEmails = lazy(() => import('@/admin/AdminEmails'))
 const AdminAnalytics = lazy(() => import('@/admin/AdminAnalytics'))
 const AdminCustomerProfile = lazy(() => import('@/admin/AdminCustomerProfile'))
+const AdminTeam = lazy(() => import('@/admin/AdminTeam'))
+const AdminActivityLog = lazy(() => import('@/admin/AdminActivityLog'))
 
 // Inventory management
 const InventoryDashboard = lazy(() => import('@/admin/inventory/InventoryDashboard'))
@@ -38,6 +40,7 @@ const InventoryProducts = lazy(() => import('@/admin/inventory/InventoryProducts
 const InventoryMovements = lazy(() => import('@/admin/inventory/InventoryMovements'))
 const InventoryScan = lazy(() => import('@/admin/inventory/InventoryScan'))
 const InventoryReports = lazy(() => import('@/admin/inventory/InventoryReports'))
+const InventoryOrders = lazy(() => import('@/admin/inventory/InventoryOrders'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -97,6 +100,8 @@ function App() {
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
         <Route path="/admin/customers/:id" element={<AdminLoader><AdminCustomerProfile /></AdminLoader>} />
+        <Route path="/admin/team" element={<AdminLoader><AdminTeam /></AdminLoader>} />
+        <Route path="/admin/activity" element={<AdminLoader><AdminActivityLog /></AdminLoader>} />
 
         {/* Inventory */}
         <Route path="/admin/inventory" element={<AdminLoader><InventoryDashboard /></AdminLoader>} />
@@ -104,6 +109,7 @@ function App() {
         <Route path="/admin/inventory/movements" element={<AdminLoader><InventoryMovements /></AdminLoader>} />
         <Route path="/admin/inventory/scan" element={<AdminLoader><InventoryScan /></AdminLoader>} />
         <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
+        <Route path="/admin/inventory/orders" element={<AdminLoader><InventoryOrders /></AdminLoader>} />
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />

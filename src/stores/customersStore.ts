@@ -16,6 +16,13 @@ export const DISCOUNT_RATES: Record<DiscountTier, number> = {
   platinum: 15,
 }
 
+export interface ExtraContact {
+  name: string
+  email: string
+  phone?: string
+  role?: string
+}
+
 export interface Customer {
   id: string
   accountType: AccountType
@@ -34,6 +41,7 @@ export interface Customer {
   discountTier?: DiscountTier
   notes?: string
   tags: string[]
+  extraContacts?: ExtraContact[]
   totalOrders: number
   totalSpent: number
   passwordHash?: string
@@ -75,6 +83,7 @@ type SupabaseCustomerRow = {
   discount_tier: string | null
   notes: string | null
   tags: string[] | null
+  extra_contacts: ExtraContact[] | null
   total_orders: number
   total_spent: number
   password_hash: string | null
@@ -103,6 +112,7 @@ function toSupabaseRow(c: Customer): SupabaseCustomerRow {
     discount_tier: c.discountTier ?? null,
     notes: c.notes ?? null,
     tags: c.tags,
+    extra_contacts: c.extraContacts ?? null,
     total_orders: c.totalOrders,
     total_spent: c.totalSpent,
     password_hash: c.passwordHash ?? null,
@@ -132,6 +142,7 @@ function fromSupabaseRow(row: SupabaseCustomerRow): Customer {
     discountTier: (row.discount_tier as DiscountTier) ?? undefined,
     notes: row.notes ?? undefined,
     tags: row.tags ?? [],
+    extraContacts: row.extra_contacts ?? undefined,
     totalOrders: row.total_orders ?? 0,
     totalSpent: Number(row.total_spent) ?? 0,
     passwordHash: row.password_hash ?? undefined,
@@ -162,6 +173,7 @@ function partialToSupabaseRow(updates: Partial<Customer>): Record<string, unknow
     discountTier: 'discount_tier',
     notes: 'notes',
     tags: 'tags',
+    extraContacts: 'extra_contacts',
     totalOrders: 'total_orders',
     totalSpent: 'total_spent',
     passwordHash: 'password_hash',

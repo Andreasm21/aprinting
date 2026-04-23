@@ -1,24 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BarChart3, Lock, LogOut, Boxes } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BarChart3, Lock, LogOut, Boxes, UserCog, History } from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
-
-function verifyPassword(input: string): boolean {
-  return input === '15583712'
-}
-
-function isAuthenticated(): boolean {
-  try { return sessionStorage.getItem('axiom_admin_auth') === '1' } catch { return false }
-}
-
-function setAuthenticated(v: boolean) {
-  try {
-    if (v) sessionStorage.setItem('axiom_admin_auth', '1')
-    else sessionStorage.removeItem('axiom_admin_auth')
-  } catch { /* no-op */ }
-}
+import { useAdminAuthStore } from '@/stores/adminAuthStore'
+import { useAuditLogStore } from '@/stores/auditLogStore'
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,8 +15,10 @@ const navItems = [
   { path: '/admin/quotations', label: 'Quotations', icon: FileText },
   { path: '/admin/emails', label: 'Emails', icon: Mail },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/admin/activity', label: 'Activity Log', icon: History },
   { path: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { path: '/admin/products', label: 'Products', icon: Package },
+  { path: '/admin/team', label: 'Team', icon: UserCog },
   { path: '/admin/hero', label: 'Hero Section', icon: FileText },
   { path: '/admin/services', label: 'Services', icon: FileText },
   { path: '/admin/pricing', label: 'Pricing', icon: DollarSign },
@@ -41,28 +30,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const location = useLocation()
   const resetAll = useContentStore((s) => s.resetAll)
   const unreadCount = useNotificationsStore((s) => s.getUnreadCount())
+  const currentUser = useAdminAuthStore((s) => s.currentUser)
+  const loading = useAdminAuthStore((s) => s.loading)
+  const bootstrap = useAdminAuthStore((s) => s.bootstrap)
+  const restoreSession = useAdminAuthStore((s) => s.restoreSession)
+  const login = useAdminAuthStore((s) => s.login)
+  const logout = useAdminAuthStore((s) => s.logout)
+  const auditLog = useAuditLogStore((s) => s.log)
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
-  const [authed, setAuthed] = useState(isAuthenticated)
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(false)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Bootstrap admin users + restore session on mount
+  useEffect(() => {
+    (async () => {
+      await bootstrap()
+      await restoreSession()
+    })()
+  }, [bootstrap, restoreSession])
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (verifyPassword(password)) {
-      setAuthenticated(true)
-      setAuthed(true)
-      setError(false)
+    setError('')
+    setSubmitting(true)
+    const result = await login(username, password)
+    setSubmitting(false)
+    if (!result.success) {
+      setError(result.error || 'Login failed')
+      setPassword('')
     } else {
-      setError(true)
+      auditLog('login', 'system', `${username} signed in`)
+      setUsername('')
       setPassword('')
     }
   }
 
   const handleLogout = () => {
-    setAuthenticated(false)
-    setAuthed(false)
-    setPassword('')
+    if (currentUser) auditLog('login', 'system', `${currentUser.username} signed out`)
+    logout()
   }
 
   const handleReset = () => {
@@ -75,7 +84,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
-  if (!authed) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <p className="font-mono text-text-muted text-xs">[ INITIALIZING ADMIN ]</p>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
         <form onSubmit={handleLogin} className="w-full max-w-sm">
@@ -94,26 +111,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div className="space-y-4">
               <div>
+                <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setError('') }}
+                  placeholder="username"
+                  autoFocus
+                  required
+                  className={`w-full bg-bg-tertiary border rounded-lg px-4 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-amber transition-colors ${error ? 'border-red-500' : 'border-border'}`}
+                />
+              </div>
+              <div>
                 <label className="block text-text-muted text-xs font-mono uppercase mb-1.5">Password</label>
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(false) }}
-                  placeholder="Enter admin password"
-                  autoFocus
-                  className={`w-full bg-bg-tertiary border rounded-lg px-4 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-amber transition-colors ${
-                    error ? 'border-red-500' : 'border-border'
-                  }`}
+                  onChange={(e) => { setPassword(e.target.value); setError('') }}
+                  placeholder="••••••••"
+                  required
+                  className={`w-full bg-bg-tertiary border rounded-lg px-4 py-2.5 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-amber transition-colors ${error ? 'border-red-500' : 'border-border'}`}
                 />
                 {error && (
-                  <p className="text-red-400 text-xs font-mono mt-1.5">Incorrect password. Try again.</p>
+                  <p className="text-red-400 text-xs font-mono mt-1.5">{error}</p>
                 )}
               </div>
               <button
                 type="submit"
-                className="w-full bg-accent-amber text-bg-primary font-mono text-sm font-bold py-2.5 rounded-lg hover:bg-accent-amber/90 transition-colors"
+                disabled={submitting}
+                className="w-full bg-accent-amber text-bg-primary font-mono text-sm font-bold py-2.5 rounded-lg hover:bg-accent-amber/90 transition-colors disabled:opacity-50"
               >
-                Login
+                {submitting ? 'Signing in...' : 'Login'}
               </button>
             </div>
           </div>
@@ -145,7 +173,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="font-mono text-lg font-bold text-accent-amber">A</span>
             <span className="font-mono text-lg font-bold text-text-primary">xiom</span>
           </div>
-          <p className="text-text-muted text-xs font-mono mt-1">Admin Panel</p>
+          {currentUser && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-accent-amber/10 flex items-center justify-center">
+                <span className="font-mono text-[10px] font-bold text-accent-amber">
+                  {currentUser.displayName.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-text-primary text-xs font-medium truncate">{currentUser.displayName}</p>
+                <p className="text-text-muted text-[10px] font-mono truncate">@{currentUser.username}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Nav */}

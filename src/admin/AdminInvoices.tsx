@@ -5,6 +5,7 @@ import { DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
 import CustomerSelector from './components/CustomerSelector'
 import LineItemsEditor from './components/LineItemsEditor'
 import DocumentPreview from './components/DocumentPreview'
+import DeleteConfirmModal from './components/DeleteConfirmModal'
 
 const STATUS_COLORS: Record<DocumentStatus, string> = {
   draft: 'text-text-muted border-border',
@@ -31,7 +32,8 @@ export default function AdminInvoices() {
   const [editing, setEditing] = useState<Invoice | null>(null)
   const [creating, setCreating] = useState(false)
   const [previewing, setPreviewing] = useState<Invoice | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; label: string } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lockPrompt, setLockPrompt] = useState<{ id: string } | null>(null)
 
   const invoicesList = useMemo(() => {
@@ -44,6 +46,38 @@ export default function AdminInvoices() {
         return inv.customerName.toLowerCase().includes(q) || inv.documentNumber.toLowerCase().includes(q) || (inv.customerCompany || '').toLowerCase().includes(q)
       })
   }, [invoices, search, statusFilter])
+
+  const requestDelete = (id: string) => {
+    const inv = invoicesList.find((x) => x.id === id)
+    if (!inv) return
+    setDeleteTarget({ ids: [id], label: `${inv.documentNumber} — ${inv.customerName}` })
+  }
+
+  const requestBulkDelete = () => {
+    if (selectedIds.size === 0) return
+    setDeleteTarget({ ids: Array.from(selectedIds), label: `${selectedIds.size} selected invoice${selectedIds.size > 1 ? 's' : ''}` })
+  }
+
+  const confirmDeletion = () => {
+    if (!deleteTarget) return
+    for (const id of deleteTarget.ids) deleteInvoice(id)
+    setDeleteTarget(null)
+    setSelectedIds(new Set())
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === invoicesList.length) setSelectedIds(new Set())
+    else setSelectedIds(new Set(invoicesList.filter((i) => !i.locked).map((i) => i.id)))
+  }
 
   const stats = useMemo(() => {
     const all = invoices.filter((i) => i.type === 'invoice')
@@ -65,9 +99,19 @@ export default function AdminInvoices() {
           </h1>
           <p className="text-text-secondary text-sm mt-1">Create and manage invoices for your customers.</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5">
-          <Plus size={14} /> New Invoice
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={requestBulkDelete}
+              className="text-xs font-mono py-2 px-4 rounded-lg border border-red-400 text-red-400 hover:bg-red-400/10 flex items-center gap-1.5"
+            >
+              <Trash2 size={13} /> Delete {selectedIds.size}
+            </button>
+          )}
+          <button onClick={() => setCreating(true)} className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5">
+            <Plus size={14} /> New Invoice
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -112,6 +156,14 @@ export default function AdminInvoices() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
+                <th className="p-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={invoicesList.length > 0 && selectedIds.size === invoicesList.filter((i) => !i.locked).length}
+                    onChange={toggleSelectAll}
+                    className="accent-accent-amber"
+                  />
+                </th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Number</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Customer</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase hidden sm:table-cell">Date</th>
@@ -122,7 +174,17 @@ export default function AdminInvoices() {
             </thead>
             <tbody>
               {invoicesList.map((inv) => (
-                <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-bg-tertiary/50 transition-colors">
+                <tr key={inv.id} className={`border-b border-border last:border-0 hover:bg-bg-tertiary/50 transition-colors ${selectedIds.has(inv.id) ? 'bg-accent-amber/5' : ''}`}>
+                  <td className="p-3">
+                    {!inv.locked && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(inv.id)}
+                        onChange={() => toggleSelect(inv.id)}
+                        className="accent-accent-amber"
+                      />
+                    )}
+                  </td>
                   <td className="p-3 font-mono text-xs text-accent-amber">{inv.documentNumber}</td>
                   <td className="p-3">
                     <div className="text-text-primary text-sm">{inv.customerName}</div>
@@ -160,8 +222,8 @@ export default function AdminInvoices() {
                             <Edit3 size={14} />
                           </button>
                           <button
-                            onClick={() => { if (confirmDelete === inv.id) { deleteInvoice(inv.id); setConfirmDelete(null) } else { setConfirmDelete(inv.id); setTimeout(() => setConfirmDelete(null), 3000) } }}
-                            className={`p-1.5 rounded ${confirmDelete === inv.id ? 'bg-red-500/10 text-red-400' : 'hover:bg-bg-tertiary text-text-muted hover:text-red-400'}`}
+                            onClick={() => requestDelete(inv.id)}
+                            className="p-1.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-red-400"
                             title="Delete"
                           >
                             <Trash2 size={14} />
@@ -233,6 +295,15 @@ export default function AdminInvoices() {
 
       {/* Preview */}
       {previewing && <DocumentPreview doc={previewing} onClose={() => setPreviewing(null)} />}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          label={deleteTarget.label}
+          count={deleteTarget.ids.length}
+          onConfirm={confirmDeletion}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   )
 }

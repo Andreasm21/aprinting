@@ -46,7 +46,7 @@ function timeAgo(dateStr: string): string {
 
 function RecentActivityFeed() {
   const entries = useAuditLogStore((s) => s.entries)
-  const recent = useMemo(() => entries.slice(0, 15), [entries])
+  const recent = useMemo(() => entries.slice(0, 5), [entries])
 
   if (recent.length === 0) return null
 
@@ -55,7 +55,7 @@ function RecentActivityFeed() {
       <div className="flex items-center gap-2 mb-4">
         <Clock size={16} className="text-accent-amber" />
         <h3 className="font-mono text-sm font-bold text-text-primary">Recent Activity</h3>
-        <span className="text-[10px] font-mono text-text-muted ml-auto">Last {recent.length} actions</span>
+        <Link to="/admin/activity" className="ml-auto text-[10px] font-mono text-accent-amber hover:underline">View all →</Link>
       </div>
       <div className="space-y-1">
         {recent.map((entry) => {
