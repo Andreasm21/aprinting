@@ -20,6 +20,7 @@ export interface InventoryProduct {
   bin?: string
   barcode?: string
   supplier?: string
+  unitWeightGrams?: number  // For material spools (e.g. 1000 for 1kg, 500 for 500g)
   archived: boolean
   createdAt: string
   updatedAt: string
@@ -65,6 +66,7 @@ interface SbProduct {
   bin: string | null
   barcode: string | null
   supplier: string | null
+  unit_weight_grams: number | null
   archived: boolean
   created_at: string
   updated_at: string
@@ -94,6 +96,7 @@ function productToRow(p: InventoryProduct): SbProduct {
     bin: p.bin ?? null,
     barcode: p.barcode ?? null,
     supplier: p.supplier ?? null,
+    unit_weight_grams: p.unitWeightGrams ?? null,
     archived: p.archived,
     created_at: p.createdAt,
     updated_at: p.updatedAt,
@@ -113,6 +116,7 @@ function rowToProduct(r: SbProduct): InventoryProduct {
     bin: r.bin ?? undefined,
     barcode: r.barcode ?? undefined,
     supplier: r.supplier ?? undefined,
+    unitWeightGrams: r.unit_weight_grams != null ? Number(r.unit_weight_grams) : 1000,
     archived: r.archived,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -157,6 +161,7 @@ function partialProductToRow(updates: Partial<InventoryProduct>): Record<string,
     bin: 'bin',
     barcode: 'barcode',
     supplier: 'supplier',
+    unitWeightGrams: 'unit_weight_grams',
     archived: 'archived',
     updatedAt: 'updated_at',
   }

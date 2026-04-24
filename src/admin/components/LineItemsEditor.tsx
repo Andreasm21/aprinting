@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import type { InvoiceLineItem } from '@/stores/invoicesStore'
-import { useContentStore } from '@/stores/contentStore'
+import { useInventoryStore } from '@/stores/inventoryStore'
 
 interface Props {
   items: InvoiceLineItem[]
@@ -8,16 +8,25 @@ interface Props {
   showMaterialFields?: boolean
 }
 
-function getAllMaterials(): { label: string; rate: number }[] {
-  const pricing = useContentStore.getState().content.pricing
-  const materials: { label: string; rate: number }[] = []
-  pricing.fdm.forEach((r) => materials.push({ label: `FDM — ${r.material}`, rate: parseFloat(r.price.replace('€', '')) }))
-  pricing.resin.forEach((r) => materials.push({ label: `Resin — ${r.type}`, rate: parseFloat(r.price.replace('€', '')) }))
-  return materials
-}
+const MATERIAL_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 
 export default function LineItemsEditor({ items, onChange, showMaterialFields = false }: Props) {
-  const materials = getAllMaterials()
+  const inventoryProducts = useInventoryStore((s) => s.products)
+
+  // Build material list from inventory: only material spools (not Hardware/Finished)
+  const materials = inventoryProducts
+    .filter((p) => !p.archived && MATERIAL_CATEGORIES.includes(p.category))
+    .map((p) => {
+      const unitWeight = p.unitWeightGrams || 1000
+      const ratePerGram = unitWeight > 0 ? p.cost / unitWeight : 0
+      const label = `${p.brand ? p.brand + ' ' : ''}${p.category}${p.name && p.name !== p.partNumber ? ' · ' + p.name.slice(0, 25) : ''}`
+      return {
+        label,
+        rate: ratePerGram,
+        partNumber: p.partNumber,
+        kgPrice: p.cost * (1000 / unitWeight),
+      }
+    })
 
   const update = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const next = [...items]
@@ -54,22 +63,27 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     onChange(next)
   }
 
+  // 8 columns when material fields shown (incl. delete button slot), 5 otherwise
+  const gridCols = showMaterialFields
+    ? 'grid-cols-[minmax(0,1fr)_120px_70px_70px_80px_50px_80px_30px]'
+    : 'grid-cols-[minmax(0,1fr)_90px_60px_80px_30px]'
+
   return (
     <div className="space-y-2">
-      {/* Header */}
-      <div className={`grid gap-2 text-[10px] font-mono uppercase text-text-muted ${showMaterialFields ? 'grid-cols-[1fr_120px_70px_70px_70px_60px_30px]' : 'grid-cols-[1fr_80px_60px_80px_30px]'}`}>
+      {/* Header — aligned with inputs below */}
+      <div className={`grid gap-2 text-[10px] font-mono uppercase text-text-muted ${gridCols}`}>
         <span>Description</span>
         {showMaterialFields && <span>Material</span>}
-        {showMaterialFields && <span>Weight(g)</span>}
-        {showMaterialFields && <span>Rate/g</span>}
-        <span>Unit Price</span>
-        <span>Qty</span>
-        <span>Total</span>
+        {showMaterialFields && <span className="text-right">Weight (g)</span>}
+        {showMaterialFields && <span className="text-right">Rate €/g</span>}
+        <span className="text-right">Unit Price €</span>
+        <span className="text-right">Qty</span>
+        <span className="text-right">Total €</span>
         <span />
       </div>
 
       {items.map((item, i) => (
-        <div key={i} className={`grid gap-2 items-center ${showMaterialFields ? 'grid-cols-[1fr_120px_70px_70px_70px_60px_30px]' : 'grid-cols-[1fr_80px_60px_80px_30px]'}`}>
+        <div key={i} className={`grid gap-2 items-center ${gridCols}`}>
           <input
             value={item.description}
             onChange={(e) => update(i, 'description', e.target.value)}
@@ -82,8 +96,16 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
               onChange={(e) => setMaterial(i, e.target.value)}
               className="bg-bg-tertiary border border-border rounded px-1 py-1.5 text-xs text-text-primary focus:border-accent-amber focus:outline-none"
             >
-              <option value="">—</option>
-              {materials.map((m) => <option key={m.label} value={m.label}>{m.label}</option>)}
+              <option value="">— pick from inventory —</option>
+              {materials.length === 0 ? (
+                <option disabled>No materials in inventory</option>
+              ) : (
+                materials.map((m) => (
+                  <option key={m.label} value={m.label}>
+                    {m.label} (€{m.kgPrice.toFixed(2)}/kg)
+                  </option>
+                ))
+              )}
             </select>
           )}
           {showMaterialFields && (

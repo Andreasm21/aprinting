@@ -1,33 +1,36 @@
 import { useState, useMemo } from 'react'
 import { X, Calculator, Plus, Zap, User, Wrench, Coins } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
+import { useInventoryStore } from '@/stores/inventoryStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 
 interface MaterialOption {
-  group: 'FDM' | 'Resin'
+  group: string
   name: string
   pricePerKg: number
 }
 
+const MATERIAL_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
+
 export default function PrintJobCalculatorModal({ onClose }: { onClose: () => void }) {
-  const pricing = useContentStore((s) => s.content.pricing)
   const pp = useContentStore((s) => s.content.printPricing)
+  const inventoryProducts = useInventoryStore((s) => s.products)
   const addToCart = useQuoteCartStore((s) => s.addItem)
 
-  // Build material options from existing pricing tables (€/g → €/kg = price × 1000)
+  // Build material options from real inventory (filament spools)
   const materials: MaterialOption[] = useMemo(() => {
-    const fdm = pricing.fdm.map((r) => ({
-      group: 'FDM' as const,
-      name: r.material,
-      pricePerKg: parseFloat(r.price.replace('€', '').replace(',', '.')) * 1000,
-    }))
-    const resin = pricing.resin.map((r) => ({
-      group: 'Resin' as const,
-      name: r.type,
-      pricePerKg: parseFloat(r.price.replace('€', '').replace(',', '.')) * 1000,
-    }))
-    return [...fdm, ...resin]
-  }, [pricing])
+    return inventoryProducts
+      .filter((p) => !p.archived && MATERIAL_CATEGORIES.includes(p.category))
+      .map((p) => {
+        const unitWeight = p.unitWeightGrams || 1000
+        const pricePerKg = p.cost * (1000 / unitWeight)
+        return {
+          group: p.category,
+          name: `${p.brand ? p.brand + ' ' : ''}${p.category}${p.name && p.name !== p.partNumber ? ' · ' + p.name.slice(0, 30) : ''}`,
+          pricePerKg,
+        }
+      })
+  }, [inventoryProducts])
 
   // Form state
   const [materialIdx, setMaterialIdx] = useState(0)

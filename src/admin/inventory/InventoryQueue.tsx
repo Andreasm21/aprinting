@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Printer, Plus, Play, Check, X as XIcon, Pause, Zap, Clock,
   AlertTriangle, Trash2, TrendingUp, Search,
@@ -8,8 +8,12 @@ import {
   type PrintJob,
   type JobPriority,
 } from '@/stores/printJobsStore'
+
+const PRIORITY_WEIGHT: Record<JobPriority, number> = {
+  urgent: 3, high: 2, normal: 1, low: 0,
+}
 import { useCustomersStore } from '@/stores/customersStore'
-import { useContentStore } from '@/stores/contentStore'
+import { useInventoryStore } from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
@@ -40,6 +44,7 @@ function formatDuration(hours?: number): string {
 }
 
 export default function InventoryQueue() {
+  const jobs = usePrintJobsStore((s) => s.jobs)
   const addJob = usePrintJobsStore((s) => s.addJob)
   const updateJob = usePrintJobsStore((s) => s.updateJob)
   const deleteJob = usePrintJobsStore((s) => s.deleteJob)
@@ -48,10 +53,34 @@ export default function InventoryQueue() {
   const failJob = usePrintJobsStore((s) => s.failJob)
   const fastTrack = usePrintJobsStore((s) => s.fastTrack)
 
-  const activeJob = usePrintJobsStore((s) => s.getActiveJob())
-  const queuedJobs = usePrintJobsStore((s) => s.getQueuedJobs())
-  const completedToday = usePrintJobsStore((s) => s.getCompletedTodayJobs())
-  const quickWins = usePrintJobsStore((s) => s.getQuickWins())
+  // Computed lists (memoized to avoid infinite re-renders)
+  const activeJob = useMemo(() => jobs.find((j) => j.status === 'printing'), [jobs])
+
+  const queuedJobs = useMemo(() => {
+    return jobs
+      .filter((j) => j.status === 'queued' || j.status === 'paused')
+      .sort((a, b) => {
+        const pw = PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
+        if (pw !== 0) return pw
+        return a.position - b.position
+      })
+  }, [jobs])
+
+  const completedToday = useMemo(() => {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    return jobs.filter((j) =>
+      (j.status === 'completed' || j.status === 'failed') &&
+      j.completedAt && new Date(j.completedAt) >= todayStart
+    )
+  }, [jobs])
+
+  const quickWins = useMemo(() => {
+    return jobs
+      .filter((j) => j.status === 'queued' && j.priority !== 'urgent' && (j.estimatedHours ?? 999) < 1)
+      .sort((a, b) => (a.estimatedHours ?? 0) - (b.estimatedHours ?? 0))
+      .slice(0, 5)
+  }, [jobs])
 
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<PrintJob | null>(null)
@@ -321,8 +350,12 @@ function PrintJobFormModal({
   onClose: () => void
   onSave: (data: Partial<Omit<PrintJob, 'id' | 'createdAt' | 'position' | 'status' | 'progress'>>) => void
 }) {
-  const pricing = useContentStore((s) => s.content.pricing)
-  const allMaterials = [...pricing.fdm.map((r) => r.material), ...pricing.resin.map((r) => r.type)]
+  // Pull materials from inventory (filament spools)
+  const inventoryProducts = useInventoryStore((s) => s.products)
+  const MATERIAL_CATS = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
+  const allMaterials = inventoryProducts
+    .filter((p) => !p.archived && MATERIAL_CATS.includes(p.category))
+    .map((p) => `${p.brand ? p.brand + ' ' : ''}${p.category}`)
 
   const [form, setForm] = useState({
     description: initial?.description || '',
