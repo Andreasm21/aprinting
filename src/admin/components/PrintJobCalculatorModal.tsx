@@ -57,13 +57,15 @@ export default function PrintJobCalculatorModal({ onClose }: { onClose: () => vo
   const totalForQuantity = priceToSell * quantity
 
   const handleAddToCart = () => {
-    const desc = `Print Job · ${currentMaterial?.name || 'Material'} · ${weightKg}kg · ${printHours}h${extraDescription ? ' · ' + extraDescription : ''}`
+    // Description shows only the filament kind (category), not the brand.
+    const filamentKind = currentMaterial?.group || 'Material'
+    const desc = `Print Job · ${filamentKind} · ${weightKg}kg · ${printHours}h${extraDescription ? ' · ' + extraDescription : ''}`
     addToCart({
       source: 'inventory',
       productId: `printjob-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       description: desc,
       unitPrice: priceToSell,
-      material: currentMaterial?.name || undefined,
+      material: filamentKind,
       quantity,
     })
     onClose()

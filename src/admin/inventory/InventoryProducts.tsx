@@ -33,11 +33,15 @@ export default function InventoryProducts() {
   const addToQuoteCart = useQuoteCartStore((s) => s.addItem)
 
   const handleQuote = (p: InventoryProduct) => {
+    // For filament spools, the description should be just the filament kind (PLA, PETG, etc.)
+    // — no brand. For Hardware/Finished items keep the descriptive name.
+    const isFilament = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'].includes(p.category)
+    const desc = isFilament ? p.category : `${p.partNumber} — ${p.name}`
     addToQuoteCart({
       source: 'inventory',
       productId: p.id,
       partNumber: p.partNumber,
-      description: `${p.partNumber} — ${p.name}`,
+      description: desc,
       unitPrice: p.price,
       material: p.category,
     })
