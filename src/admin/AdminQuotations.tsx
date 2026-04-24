@@ -326,9 +326,12 @@ function QuotationEditor({
     notes: initial?.notes || '',
     termsAndConditions: initial?.termsAndConditions || DEFAULT_TERMS,
     status: initial?.status || 'draft' as DocumentStatus,
+    // VAT toggle — defaults to ON. If the existing document has vatRate=0 we treat it as OFF.
+    vatEnabled: initial ? (initial.vatRate ?? CYPRUS_VAT_RATE) > 0 : true,
   })
 
-  const totals = calcTotals(form.lineItems, form.deliveryFee, CYPRUS_VAT_RATE, form.discountPercent, form.extraCharge)
+  const effectiveVatRate = form.vatEnabled ? CYPRUS_VAT_RATE : 0
+  const totals = calcTotals(form.lineItems, form.deliveryFee, effectiveVatRate, form.discountPercent, form.extraCharge)
 
   const handleCustomerSelect = (customer: Customer | null) => {
     if (!customer) {
@@ -367,7 +370,7 @@ function QuotationEditor({
       billingPostalCode: form.billingPostalCode || undefined,
       lineItems: form.lineItems,
       subtotal: totals.subtotal,
-      vatRate: CYPRUS_VAT_RATE,
+      vatRate: effectiveVatRate,
       vatAmount: totals.vatAmount,
       deliveryFee: form.deliveryFee,
       discountPercent: form.discountPercent,
@@ -472,7 +475,7 @@ function QuotationEditor({
           {/* Totals Summary */}
           <div className="bg-bg-tertiary rounded-lg p-4 space-y-1.5 text-sm font-mono">
             <div className="flex justify-between text-text-secondary">
-              <span>Subtotal</span>
+              <span>Subtotal <span className="text-[10px] text-accent-amber">(incl. markup)</span></span>
               <span>€{totals.subtotal.toFixed(2)}</span>
             </div>
             {form.discountPercent > 0 && (
@@ -481,8 +484,16 @@ function QuotationEditor({
                 <span>-€{totals.discountAmount.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-text-secondary">
-              <span>VAT (19%)</span>
+            <div className="flex justify-between items-center text-text-secondary">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.vatEnabled}
+                  onChange={(e) => setForm({ ...form, vatEnabled: e.target.checked })}
+                  className="accent-accent-amber"
+                />
+                <span>VAT (19%) {!form.vatEnabled && <span className="text-[10px] text-text-muted">— disabled</span>}</span>
+              </label>
               <span>€{totals.vatAmount.toFixed(2)}</span>
             </div>
             {form.deliveryFee > 0 && (

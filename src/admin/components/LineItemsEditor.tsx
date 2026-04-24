@@ -47,11 +47,12 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     const next = [...items]
     const item = { ...next[index], [field]: value }
 
-    // recalc unit price using the formula whenever material inputs change
+    // recalc unit price using the formula whenever material inputs change.
+    // Use ?? not || so an explicit hours=0 stays 0 (user wants no labour cost).
     if (showMaterialFields && (field === 'weightGrams' || field === 'ratePerGram' || field === 'hours')) {
       const w = Number(item.weightGrams) || 0
       const r = Number(item.ratePerGram) || 0
-      const h = Number(item.hours) || defaultLabourHours
+      const h = item.hours ?? defaultLabourHours
       item.unitPrice = calcUnitPrice(w, r, h)
     }
     item.total = item.unitPrice * item.quantity
@@ -79,7 +80,7 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     if (!mat) return
     const next = [...items]
     const item = { ...next[index], material: materialLabel, ratePerGram: mat.rate }
-    const h = Number(item.hours) || defaultLabourHours
+    const h = item.hours ?? defaultLabourHours
     if (item.weightGrams) {
       item.unitPrice = calcUnitPrice(item.weightGrams, mat.rate, h)
       item.total = item.unitPrice * item.quantity
