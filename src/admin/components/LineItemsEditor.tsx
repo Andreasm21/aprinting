@@ -1,6 +1,7 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Lock } from 'lucide-react'
 import type { InvoiceLineItem } from '@/stores/invoicesStore'
 import { useInventoryStore } from '@/stores/inventoryStore'
+import { useContentStore } from '@/stores/contentStore'
 
 interface Props {
   items: InvoiceLineItem[]
@@ -12,6 +13,10 @@ const MATERIAL_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 
 export default function LineItemsEditor({ items, onChange, showMaterialFields = false }: Props) {
   const inventoryProducts = useInventoryStore((s) => s.products)
+  const printPricing = useContentStore((s) => s.content.printPricing)
+
+  // Locked rates pulled from admin pricing settings.
+  const { electricityRate, labourRate, depreciationRate, profitMarkup, defaultPowerDraw, defaultLabourHours } = printPricing
 
   // Build material list from inventory: only material spools (not Hardware/Finished)
   const materials = inventoryProducts
@@ -28,13 +33,26 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
       }
     })
 
+  // Apply COGS formula: Material + Electricity + Labour + Depreciation, then × (1 + markup)
+  const calcUnitPrice = (weightGrams: number, ratePerGram: number, hours: number) => {
+    const material = weightGrams * ratePerGram
+    const electricity = hours * defaultPowerDraw * electricityRate
+    const labour = hours * labourRate
+    const depreciation = hours * depreciationRate
+    const cogs = material + electricity + labour + depreciation
+    return cogs * (1 + profitMarkup / 100)
+  }
+
   const update = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const next = [...items]
     const item = { ...next[index], [field]: value }
 
-    // recalc total
-    if (showMaterialFields && item.weightGrams && item.ratePerGram) {
-      item.unitPrice = item.weightGrams * item.ratePerGram
+    // recalc unit price using the formula whenever material inputs change
+    if (showMaterialFields && (field === 'weightGrams' || field === 'ratePerGram' || field === 'hours')) {
+      const w = Number(item.weightGrams) || 0
+      const r = Number(item.ratePerGram) || 0
+      const h = Number(item.hours) || defaultLabourHours
+      item.unitPrice = calcUnitPrice(w, r, h)
     }
     item.total = item.unitPrice * item.quantity
 
@@ -43,7 +61,13 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
   }
 
   const addRow = () => {
-    onChange([...items, { description: '', unitPrice: 0, quantity: 1, total: 0 }])
+    onChange([...items, {
+      description: '',
+      unitPrice: 0,
+      quantity: 1,
+      total: 0,
+      hours: defaultLabourHours,
+    }])
   }
 
   const removeRow = (index: number) => {
@@ -55,26 +79,42 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     if (!mat) return
     const next = [...items]
     const item = { ...next[index], material: materialLabel, ratePerGram: mat.rate }
+    const h = Number(item.hours) || defaultLabourHours
     if (item.weightGrams) {
-      item.unitPrice = item.weightGrams * mat.rate
+      item.unitPrice = calcUnitPrice(item.weightGrams, mat.rate, h)
       item.total = item.unitPrice * item.quantity
     }
     next[index] = item
     onChange(next)
   }
 
-  // 8 columns when material fields shown (incl. delete button slot), 5 otherwise
+  // Columns: Description | Material | Weight | Hours | Rate/g | Unit € | Qty | Total | ✕
   const gridCols = showMaterialFields
-    ? 'grid-cols-[minmax(0,1fr)_120px_70px_70px_80px_50px_80px_30px]'
+    ? 'grid-cols-[minmax(0,1fr)_120px_70px_60px_70px_80px_50px_80px_30px]'
     : 'grid-cols-[minmax(0,1fr)_90px_60px_80px_30px]'
 
   return (
     <div className="space-y-2">
+      {/* Locked-pricing bar — shows the formula inputs the admin has set */}
+      {showMaterialFields && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-text-muted bg-bg-tertiary/50 border border-border rounded px-3 py-2">
+          <span className="flex items-center gap-1 text-accent-amber">
+            <Lock size={10} /> FORMULA INPUTS (editable in Admin → Pricing)
+          </span>
+          <span>Power: <strong className="text-text-primary">{(defaultPowerDraw * 1000).toFixed(0)} W</strong></span>
+          <span>Electricity: <strong className="text-text-primary">€{electricityRate.toFixed(2)}/kWh</strong></span>
+          <span>Labour: <strong className="text-text-primary">€{labourRate.toFixed(2)}/hr</strong></span>
+          <span>Depreciation: <strong className="text-text-primary">€{depreciationRate.toFixed(2)}/hr</strong></span>
+          <span>Markup: <strong className="text-text-primary">+{profitMarkup}%</strong></span>
+        </div>
+      )}
+
       {/* Header — aligned with inputs below */}
       <div className={`grid gap-2 text-[10px] font-mono uppercase text-text-muted ${gridCols}`}>
         <span>Description</span>
         {showMaterialFields && <span>Material</span>}
         {showMaterialFields && <span className="text-right">Weight (g)</span>}
+        {showMaterialFields && <span className="text-right">Hours</span>}
         {showMaterialFields && <span className="text-right">Rate €/g</span>}
         <span className="text-right">Unit Price €</span>
         <span className="text-right">Qty</span>
@@ -120,6 +160,17 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
           {showMaterialFields && (
             <input
               type="number"
+              step="0.25"
+              min={0}
+              value={item.hours ?? defaultLabourHours}
+              onChange={(e) => update(i, 'hours', parseFloat(e.target.value) || 0)}
+              className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary text-right focus:border-accent-amber focus:outline-none"
+              title="Print + labour time (used for electricity/labour/depreciation)"
+            />
+          )}
+          {showMaterialFields && (
+            <input
+              type="number"
               step="0.01"
               min={0}
               value={item.ratePerGram ?? ''}
@@ -134,6 +185,7 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
             value={item.unitPrice}
             onChange={(e) => update(i, 'unitPrice', parseFloat(e.target.value) || 0)}
             className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary text-right focus:border-accent-amber focus:outline-none"
+            title={showMaterialFields ? 'Auto-calculated from formula. Override if needed.' : undefined}
           />
           <input
             type="number"

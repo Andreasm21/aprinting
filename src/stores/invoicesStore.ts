@@ -16,6 +16,7 @@ export interface InvoiceLineItem {
   material?: string
   weightGrams?: number
   ratePerGram?: number
+  hours?: number       // print + labour time used for electricity/labour/depreciation calc
   unitPrice: number
   quantity: number
   total: number
