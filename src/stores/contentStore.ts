@@ -301,8 +301,6 @@ async function fetchAll() {
 // ─────────────── Store ───────────────
 
 export const useContentStore = create<ContentState>((set, get) => {
-  fetchAll()
-
   return {
     products: defaultProducts, // shown until Supabase fetch completes
     content: defaultContent,
@@ -401,3 +399,6 @@ export const useContentStore = create<ContentState>((set, get) => {
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchAll()

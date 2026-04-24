@@ -116,8 +116,6 @@ async function fetchFromSupabase(): Promise<void> {
 }
 
 export const useAuditLogStore = create<AuditLogState>((set, get) => {
-  fetchFromSupabase()
-
   return {
     entries: [],
     loading: true,
@@ -162,3 +160,6 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => {
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchFromSupabase()

@@ -185,9 +185,6 @@ function getMaterialRate(material: string): number {
 // ---------------------------------------------------------------------------
 
 export const useInvoicesStore = create<InvoicesState>((set, get) => {
-  // Kick off Supabase fetch on store creation (non-blocking)
-  fetchFromSupabase()
-
   return {
     invoices: [],
     loading: true,
@@ -461,3 +458,6 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchFromSupabase()

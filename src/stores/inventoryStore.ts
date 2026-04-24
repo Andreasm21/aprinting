@@ -226,8 +226,6 @@ async function fetchFromSupabase() {
 // ─────────────────────── Store ──────────────────────────────────────
 
 export const useInventoryStore = create<InventoryState>((set, get) => {
-  fetchFromSupabase()
-
   return {
     products: [],
     movements: [],
@@ -320,3 +318,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
     getProductByBarcode: (bc) => get().products.find((p) => p.barcode === bc),
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store reference is fully assigned.
+// Calling this inside the create() callback hits a temporal-dead-zone when
+// fetchFromSupabase tries to read `useInventoryStore.setState` before the
+// `export const useInventoryStore` assignment completes — silent failure,
+// store stays loading: true forever, page renders "0 products".
+void fetchFromSupabase()

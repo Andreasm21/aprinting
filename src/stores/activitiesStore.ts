@@ -108,7 +108,6 @@ async function fetchFromSupabase(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export const useActivitiesStore = create<ActivitiesState>((set, get) => {
-  fetchFromSupabase()
 
   return {
     activities: [],
@@ -136,3 +135,6 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => {
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchFromSupabase()

@@ -134,8 +134,6 @@ async function fetchFromSupabase() {
 }
 
 export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => {
-  fetchFromSupabase()
-
   return {
     orders: [],
     loading: true,
@@ -207,3 +205,6 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchFromSupabase()

@@ -155,8 +155,6 @@ async function fetchFromSupabase() {
 }
 
 export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
-  fetchFromSupabase()
-
   return {
     jobs: [],
     loading: true,
@@ -263,3 +261,6 @@ export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
     },
   }
 })
+
+// Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
+void fetchFromSupabase()
