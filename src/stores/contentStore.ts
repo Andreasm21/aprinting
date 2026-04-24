@@ -1,10 +1,8 @@
 import { create } from 'zustand'
 import type { Product } from '@/types'
 import { products as defaultProducts } from '@/data/products'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
-
-const STORAGE_KEY_PRODUCTS = 'aprinting_products'
-const STORAGE_KEY_CONTENT = 'aprinting_content'
 
 export interface SiteContent {
   hero: {
@@ -41,6 +39,14 @@ export interface SiteContent {
     fdm: { material: string; price: string; min: string }[]
     resin: { type: string; price: string; min: string }[]
     designRate: string
+  }
+  printPricing: {
+    electricityRate: number       // €/kWh
+    labourRate: number            // €/hr
+    depreciationRate: number      // €/hr
+    profitMarkup: number          // % (e.g. 30 = +30% on top of COGS)
+    defaultPowerDraw: number      // kW
+    defaultLabourHours: number    // hours of human work per job (default)
   }
 }
 
@@ -86,7 +92,7 @@ const defaultContent: SiteContent = {
   },
   contact: {
     whatsappNumber: '+357 99 000 000',
-    email: 'hello@axiom3d.cy',
+    email: 'team@axiomcreate.com',
     location: 'Cyprus 🇨🇾',
     hours: 'Mon – Sat: 9:00 – 19:00',
   },
@@ -109,27 +115,20 @@ const defaultContent: SiteContent = {
     ],
     designRate: '€15',
   },
-}
-
-function loadProducts(): Product[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_PRODUCTS)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return defaultProducts
-}
-
-function loadContent(): SiteContent {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_CONTENT)
-    if (stored) return { ...defaultContent, ...JSON.parse(stored) }
-  } catch { /* ignore */ }
-  return defaultContent
+  printPricing: {
+    electricityRate: 0.32,
+    labourRate: 7,
+    depreciationRate: 0.30,
+    profitMarkup: 30,
+    defaultPowerDraw: 0.45,
+    defaultLabourHours: 1,
+  },
 }
 
 interface ContentState {
   products: Product[]
   content: SiteContent
+  loading: boolean
   addProduct: (product: Omit<Product, 'id'>) => void
   updateProduct: (id: number, product: Partial<Product>) => void
   deleteProduct: (id: number) => void
@@ -140,97 +139,265 @@ interface ContentState {
   resetAll: () => void
 }
 
-export const useContentStore = create<ContentState>((set, get) => ({
-  products: loadProducts(),
-  content: loadContent(),
+// ─────────────── Supabase converters: storefront_products ───────────────
 
-  addProduct: (product) => {
-    const maxId = Math.max(0, ...get().products.map((p) => p.id))
-    const newProduct = { ...product, id: maxId + 1 }
-    set((state) => {
-      const products = [...state.products, newProduct]
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
-      return { products }
-    })
-    useAuditLogStore.getState().log('create', 'product', `Product "${product.name}" added`)
-  },
+interface SbProductRow {
+  id: number
+  name: string
+  name_gr: string | null
+  category: string
+  material: string | null
+  price: number
+  description: string | null
+  description_gr: string | null
+  badge: string | null
+  in_stock: boolean
+  model_url: string | null
+  image_url: string | null
+  created_at: string
+  updated_at: string
+}
 
-  updateProduct: (id, updates) => {
-    const p = get().products.find((p) => p.id === id)
-    set((state) => {
-      const products = state.products.map((p) => (p.id === id ? { ...p, ...updates } : p))
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
-      return { products }
-    })
-    if (p) useAuditLogStore.getState().log('update', 'product', `Product "${p.name}" updated`)
-  },
+function productToRow(p: Product): Omit<SbProductRow, 'created_at' | 'updated_at'> {
+  return {
+    id: p.id,
+    name: p.name,
+    name_gr: p.nameGr ?? null,
+    category: p.category,
+    material: p.material ?? null,
+    price: p.price,
+    description: p.description ?? null,
+    description_gr: p.descriptionGr ?? null,
+    badge: p.badge ?? null,
+    in_stock: p.inStock,
+    model_url: p.modelUrl ?? null,
+    image_url: p.imageUrl ?? null,
+  }
+}
 
-  deleteProduct: (id) => {
-    const p = get().products.find((p) => p.id === id)
-    set((state) => {
-      const products = state.products.filter((p) => p.id !== id)
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products))
-      return { products }
-    })
-    if (p) useAuditLogStore.getState().log('delete', 'product', `Product "${p.name}" deleted`)
-  },
+function rowToProduct(r: SbProductRow): Product {
+  return {
+    id: r.id,
+    name: r.name,
+    nameGr: r.name_gr ?? '',
+    category: (r.category || 'fdm') as Product['category'],
+    material: r.material ?? '',
+    price: Number(r.price),
+    description: r.description ?? '',
+    descriptionGr: r.description_gr ?? '',
+    badge: r.badge ?? undefined,
+    inStock: r.in_stock,
+    modelUrl: r.model_url ?? undefined,
+    imageUrl: r.image_url ?? undefined,
+  }
+}
 
-  updateContent: (section, data) => {
-    set((state) => {
-      const content = {
-        ...state.content,
-        [section]: { ...state.content[section], ...data },
-      }
-      localStorage.setItem(STORAGE_KEY_CONTENT, JSON.stringify(content))
-      return { content }
-    })
-    useAuditLogStore.getState().log('update', 'content', `${String(section)} section updated`)
-  },
+// ─────────────── Supabase ops ───────────────
 
-  updatePricingRow: (table, index, data) => {
-    set((state) => {
-      const rows = [...state.content.pricing[table]]
-      rows[index] = { ...rows[index], ...data }
-      const content = {
-        ...state.content,
-        pricing: { ...state.content.pricing, [table]: rows },
-      }
-      localStorage.setItem(STORAGE_KEY_CONTENT, JSON.stringify(content))
-      return { content }
-    })
-  },
+async function sbFetchProducts(): Promise<Product[]> {
+  if (!isSupabaseConfigured) return []
+  try {
+    const { data, error } = await supabase
+      .from('storefront_products')
+      .select('*')
+      .order('id', { ascending: true })
+    if (error) {
+      console.error('[content] fetch products:', error)
+      return []
+    }
+    return ((data || []) as SbProductRow[]).map(rowToProduct)
+  } catch (err) {
+    console.error('[content]', err)
+    return []
+  }
+}
 
-  addPricingRow: (table) => {
-    set((state) => {
-      const newRow = table === 'fdm'
-        ? { material: 'New Material', price: '€0.00', min: '€0' }
-        : { type: 'New Type', price: '€0.00', min: '€0' }
-      const rows = [...state.content.pricing[table], newRow]
-      const content = {
-        ...state.content,
-        pricing: { ...state.content.pricing, [table]: rows },
-      }
-      localStorage.setItem(STORAGE_KEY_CONTENT, JSON.stringify(content))
-      return { content }
-    })
-  },
+async function sbUpsertProduct(p: Product) {
+  if (!isSupabaseConfigured) return
+  try {
+    const { error } = await supabase.from('storefront_products').upsert(productToRow(p), { onConflict: 'id' })
+    if (error) console.error('[content] upsert product:', error)
+  } catch (err) { console.error('[content]', err) }
+}
 
-  deletePricingRow: (table, index) => {
-    set((state) => {
-      const rows = state.content.pricing[table].filter((_, i) => i !== index)
-      const content = {
-        ...state.content,
-        pricing: { ...state.content.pricing, [table]: rows },
-      }
-      localStorage.setItem(STORAGE_KEY_CONTENT, JSON.stringify(content))
-      return { content }
-    })
-  },
+async function sbDeleteProduct(id: number) {
+  if (!isSupabaseConfigured) return
+  try {
+    const { error } = await supabase.from('storefront_products').delete().eq('id', id)
+    if (error) console.error('[content] delete product:', error)
+  } catch (err) { console.error('[content]', err) }
+}
 
-  resetAll: () => {
-    localStorage.removeItem(STORAGE_KEY_PRODUCTS)
-    localStorage.removeItem(STORAGE_KEY_CONTENT)
-    set({ products: defaultProducts, content: defaultContent })
-    useAuditLogStore.getState().log('reset', 'system', 'All data reset to defaults')
-  },
-}))
+async function sbBulkUpsertProducts(products: Product[]) {
+  if (!isSupabaseConfigured) return
+  try {
+    const rows = products.map(productToRow)
+    const { error } = await supabase.from('storefront_products').upsert(rows, { onConflict: 'id' })
+    if (error) console.error('[content] bulk upsert products:', error)
+  } catch (err) { console.error('[content]', err) }
+}
+
+async function sbFetchContent(): Promise<SiteContent | null> {
+  if (!isSupabaseConfigured) return null
+  try {
+    const { data, error } = await supabase
+      .from('site_content')
+      .select('data')
+      .eq('id', 'singleton')
+      .maybeSingle()
+    if (error) {
+      console.error('[content] fetch content:', error)
+      return null
+    }
+    if (!data) return null
+    return data.data as SiteContent
+  } catch (err) {
+    console.error('[content]', err)
+    return null
+  }
+}
+
+async function sbUpsertContent(content: SiteContent) {
+  if (!isSupabaseConfigured) return
+  try {
+    const { error } = await supabase
+      .from('site_content')
+      .upsert({ id: 'singleton', data: content, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+    if (error) console.error('[content] upsert content:', error)
+  } catch (err) { console.error('[content]', err) }
+}
+
+// ─────────────── Initial fetch ───────────────
+
+async function fetchAll() {
+  useContentStore.setState({ loading: true })
+  try {
+    const [content, products] = await Promise.all([sbFetchContent(), sbFetchProducts()])
+
+    // If site_content is empty, seed it with defaults
+    let resolvedContent: SiteContent
+    if (content) {
+      // Merge with defaults to fill in any new fields added since last save
+      resolvedContent = { ...defaultContent, ...content }
+    } else {
+      resolvedContent = defaultContent
+      sbUpsertContent(defaultContent) // seed (fire and forget)
+    }
+
+    // If storefront_products is empty, seed it with defaults
+    let resolvedProducts = products
+    if (products.length === 0) {
+      resolvedProducts = defaultProducts
+      sbBulkUpsertProducts(defaultProducts) // seed (fire and forget)
+    }
+
+    useContentStore.setState({ content: resolvedContent, products: resolvedProducts, loading: false })
+  } catch (err) {
+    console.error('[content] fetchAll error:', err)
+    useContentStore.setState({ loading: false })
+  }
+}
+
+// ─────────────── Store ───────────────
+
+export const useContentStore = create<ContentState>((set, get) => {
+  fetchAll()
+
+  return {
+    products: defaultProducts, // shown until Supabase fetch completes
+    content: defaultContent,
+    loading: true,
+
+    addProduct: (product) => {
+      const maxId = Math.max(0, ...get().products.map((p) => p.id))
+      const newProduct: Product = { ...product, id: maxId + 1 }
+      set((state) => ({ products: [...state.products, newProduct] }))
+      void sbUpsertProduct(newProduct)
+      useAuditLogStore.getState().log('create', 'product', `Product "${product.name}" added`)
+    },
+
+    updateProduct: (id, updates) => {
+      const p = get().products.find((p) => p.id === id)
+      let updated: Product | undefined
+      set((state) => ({
+        products: state.products.map((p) => {
+          if (p.id !== id) return p
+          updated = { ...p, ...updates }
+          return updated
+        }),
+      }))
+      if (updated) void sbUpsertProduct(updated)
+      if (p) useAuditLogStore.getState().log('update', 'product', `Product "${p.name}" updated`)
+    },
+
+    deleteProduct: (id) => {
+      const p = get().products.find((p) => p.id === id)
+      set((state) => ({ products: state.products.filter((p) => p.id !== id) }))
+      void sbDeleteProduct(id)
+      if (p) useAuditLogStore.getState().log('delete', 'product', `Product "${p.name}" deleted`)
+    },
+
+    updateContent: (section, data) => {
+      let newContent: SiteContent | undefined
+      set((state) => {
+        newContent = {
+          ...state.content,
+          [section]: { ...state.content[section], ...data },
+        }
+        return { content: newContent }
+      })
+      if (newContent) void sbUpsertContent(newContent)
+      useAuditLogStore.getState().log('update', 'content', `${String(section)} section updated`)
+    },
+
+    updatePricingRow: (table, index, data) => {
+      let newContent: SiteContent | undefined
+      set((state) => {
+        const rows = [...state.content.pricing[table]]
+        rows[index] = { ...rows[index], ...data }
+        newContent = {
+          ...state.content,
+          pricing: { ...state.content.pricing, [table]: rows },
+        }
+        return { content: newContent }
+      })
+      if (newContent) void sbUpsertContent(newContent)
+    },
+
+    addPricingRow: (table) => {
+      let newContent: SiteContent | undefined
+      set((state) => {
+        const newRow = table === 'fdm'
+          ? { material: 'New Material', price: '€0.00', min: '€0' }
+          : { type: 'New Type', price: '€0.00', min: '€0' }
+        const rows = [...state.content.pricing[table], newRow]
+        newContent = {
+          ...state.content,
+          pricing: { ...state.content.pricing, [table]: rows },
+        }
+        return { content: newContent }
+      })
+      if (newContent) void sbUpsertContent(newContent)
+    },
+
+    deletePricingRow: (table, index) => {
+      let newContent: SiteContent | undefined
+      set((state) => {
+        const rows = state.content.pricing[table].filter((_, i) => i !== index)
+        newContent = {
+          ...state.content,
+          pricing: { ...state.content.pricing, [table]: rows },
+        }
+        return { content: newContent }
+      })
+      if (newContent) void sbUpsertContent(newContent)
+    },
+
+    resetAll: () => {
+      set({ products: defaultProducts, content: defaultContent })
+      void sbUpsertContent(defaultContent)
+      void sbBulkUpsertProducts(defaultProducts)
+      useAuditLogStore.getState().log('reset', 'system', 'All data reset to defaults')
+    },
+  }
+})

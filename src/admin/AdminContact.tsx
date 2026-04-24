@@ -22,7 +22,7 @@ export default function AdminContact() {
 
         <div>
           <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email Address</label>
-          <input value={contact.email} onChange={(e) => update('email', e.target.value)} className="input-field max-w-sm" placeholder="hello@axiom3d.cy" />
+          <input value={contact.email} onChange={(e) => update('email', e.target.value)} className="input-field max-w-sm" placeholder="team@axiomcreate.com" />
         </div>
 
         <div>

@@ -2,8 +2,6 @@ import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
 
-const STORAGE_KEY = 'axiom_purchase_orders'
-
 export type POStatus = 'ordered' | 'shipped' | 'received' | 'cancelled'
 
 export interface POItem {
@@ -35,24 +33,12 @@ export interface PurchaseOrder {
 
 interface PurchaseOrdersState {
   orders: PurchaseOrder[]
+  loading: boolean
   addOrder: (data: Omit<PurchaseOrder, 'id' | 'createdAt'>) => string
   updateOrder: (id: string, updates: Partial<PurchaseOrder>) => void
   deleteOrder: (id: string) => void
   receiveItem: (orderId: string, itemId: string, inventoryProductId: string) => void
   getNextPONumber: () => string
-}
-
-// localStorage helpers
-function load(): PurchaseOrder[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(orders: PurchaseOrder[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders))
 }
 
 // Supabase converters
@@ -123,7 +109,11 @@ async function sbDelete(id: string) {
 }
 
 async function fetchFromSupabase() {
-  if (!isSupabaseConfigured) return
+  if (!isSupabaseConfigured) {
+    usePurchaseOrdersStore.setState({ loading: false })
+    return
+  }
+  usePurchaseOrdersStore.setState({ loading: true })
   try {
     const { data, error } = await supabase
       .from('purchase_orders')
@@ -131,20 +121,15 @@ async function fetchFromSupabase() {
       .order('ordered_at', { ascending: false })
     if (error) {
       console.error('[po] fetch error:', error)
+      usePurchaseOrdersStore.setState({ loading: false })
       return
     }
-    if (data && data.length > 0) {
-      const orders = (data as SbRow[]).map(fromRow)
-      save(orders)
-      usePurchaseOrdersStore.setState({ orders })
-    } else {
-      const local = load()
-      if (local.length > 0) {
-        for (const o of local) sbUpsert(o)
-      }
-    }
+    const rows = (data || []) as SbRow[]
+    const orders = rows.map(fromRow)
+    usePurchaseOrdersStore.setState({ orders, loading: false })
   } catch (err) {
     console.error('[po]', err)
+    usePurchaseOrdersStore.setState({ loading: false })
   }
 }
 
@@ -152,7 +137,8 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
   fetchFromSupabase()
 
   return {
-    orders: load(),
+    orders: [],
+    loading: true,
 
     addOrder: (data) => {
       const id = `po-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -161,12 +147,8 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
         id,
         createdAt: new Date().toISOString(),
       }
-      set((state) => {
-        const orders = [order, ...state.orders]
-        save(orders)
-        return { orders }
-      })
-      sbUpsert(order)
+      set((state) => ({ orders: [order, ...state.orders] }))
+      void sbUpsert(order)
       useAuditLogStore.getState().log('create', 'product', `PO ${order.poNumber} created`, `${order.supplier} · ${order.items.length} items`)
       return id
     },
@@ -179,11 +161,10 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
           updated = { ...o, ...updates }
           return updated
         })
-        save(orders)
         return { orders }
       })
       if (updated) {
-        sbUpsert(updated)
+        void sbUpsert(updated)
         if (updates.status) useAuditLogStore.getState().log('status_change', 'product', `PO ${updated.poNumber} → ${updates.status}`)
       }
     },
@@ -191,12 +172,8 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
     deleteOrder: (id) => {
       const o = get().orders.find((x) => x.id === id)
       if (o) useAuditLogStore.getState().log('delete', 'product', `PO ${o.poNumber} deleted`)
-      set((state) => {
-        const orders = state.orders.filter((o) => o.id !== id)
-        save(orders)
-        return { orders }
-      })
-      sbDelete(id)
+      set((state) => ({ orders: state.orders.filter((o) => o.id !== id) }))
+      void sbDelete(id)
     },
 
     receiveItem: (orderId, itemId, inventoryProductId) => {
@@ -214,10 +191,9 @@ export const usePurchaseOrdersStore = create<PurchaseOrdersState>((set, get) => 
           }
           return updated
         })
-        save(orders)
         return { orders }
       })
-      if (updated) sbUpsert(updated)
+      if (updated) void sbUpsert(updated)
     },
 
     getNextPONumber: () => {

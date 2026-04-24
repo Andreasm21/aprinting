@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import bcrypt from 'bcryptjs'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
-const STORAGE_KEY = 'axiom_admin_users'
 const SESSION_KEY = 'axiom_admin_session'
 const BOOTSTRAP_USERNAME = 'owner'
 const BOOTSTRAP_PASSWORD = '15583712'
@@ -39,20 +38,6 @@ interface AdminAuthState {
   changePassword: (id: string, newPassword: string, clearMustChange?: boolean) => Promise<void>
   resetPassword: (id: string) => Promise<{ success: boolean; password?: string }>
   deleteAdmin: (id: string) => { success: boolean; error?: string }
-}
-
-// ──────────────────────── localStorage helpers ────────────────────────
-
-function load(): AdminUser[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(users: AdminUser[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(users))
 }
 
 // ──────────────────────── Supabase converters ────────────────────────
@@ -130,7 +115,7 @@ async function sbFetch(): Promise<AdminUser[]> {
 // ──────────────────────── Store ────────────────────────
 
 export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
-  users: load(),
+  users: [],
   currentUser: null,
   loading: true,
 
@@ -143,28 +128,19 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
 
     if (remote.length > 0) {
       users = remote
-      save(users)
     } else {
-      // Push localStorage to Supabase if it has users
-      const local = load()
-      if (local.length > 0) {
-        users = local
-        for (const u of local) sbUpsert(u)
-      } else {
-        // Seed bootstrap owner
-        console.log('[admin] Seeding bootstrap owner account')
-        const hash = await bcrypt.hash(BOOTSTRAP_PASSWORD, 10)
-        const owner: AdminUser = {
-          id: `admin-${Date.now()}-owner`,
-          username: BOOTSTRAP_USERNAME,
-          displayName: 'Owner',
-          passwordHash: hash,
-          createdAt: new Date().toISOString(),
-        }
-        users = [owner]
-        save(users)
-        sbUpsert(owner)
+      // Seed bootstrap owner in Supabase
+      console.log('[admin] Seeding bootstrap owner account')
+      const hash = await bcrypt.hash(BOOTSTRAP_PASSWORD, 10)
+      const owner: AdminUser = {
+        id: `admin-${Date.now()}-owner`,
+        username: BOOTSTRAP_USERNAME,
+        displayName: 'Owner',
+        passwordHash: hash,
+        createdAt: new Date().toISOString(),
       }
+      users = [owner]
+      await sbUpsert(owner)
     }
 
     set({ users, loading: false })
@@ -177,12 +153,11 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
     if (!valid) return { success: false, error: 'Invalid username or password' }
 
     const updated: AdminUser = { ...u, lastLoginAt: new Date().toISOString() }
-    set((state) => {
-      const users = state.users.map((x) => (x.id === u.id ? updated : x))
-      save(users)
-      return { users, currentUser: updated }
-    })
-    sbUpsert(updated)
+    set((state) => ({
+      users: state.users.map((x) => (x.id === u.id ? updated : x)),
+      currentUser: updated,
+    }))
+    await sbUpsert(updated)
 
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: u.id, username: u.username }))
@@ -237,12 +212,8 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
       mustChangePassword: true,
       createdAt: new Date().toISOString(),
     }
-    set((state) => {
-      const users = [...state.users, user]
-      save(users)
-      return { users }
-    })
-    sbUpsert(user)
+    set((state) => ({ users: [...state.users, user] }))
+    await sbUpsert(user)
     return { success: true, generatedPassword: finalPassword }
   },
 
@@ -258,10 +229,9 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
         }
         return updated
       })
-      save(users)
       return { users, currentUser: state.currentUser?.id === id ? (updated || state.currentUser) : state.currentUser }
     })
-    if (updated) sbUpsert(updated)
+    if (updated) await sbUpsert(updated)
   },
 
   changePassword: async (id, newPassword, clearMustChange = false) => {
@@ -273,10 +243,9 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
         updated = { ...u, passwordHash: hash, mustChangePassword: clearMustChange ? false : u.mustChangePassword }
         return updated
       })
-      save(users)
       return { users, currentUser: state.currentUser?.id === id ? (updated || state.currentUser) : state.currentUser }
     })
-    if (updated) sbUpsert(updated)
+    if (updated) await sbUpsert(updated)
   },
 
   resetPassword: async (id) => {
@@ -290,10 +259,9 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
         updated = { ...u, passwordHash: hash, mustChangePassword: true }
         return updated
       })
-      save(users)
       return { users, currentUser: state.currentUser?.id === id ? (updated || state.currentUser) : state.currentUser }
     })
-    if (updated) sbUpsert(updated)
+    if (updated) await sbUpsert(updated)
     return { success: true, password: newPw }
   },
 
@@ -305,12 +273,8 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
     if (state.currentUser?.id === id) {
       return { success: false, error: 'Cannot delete your own account' }
     }
-    set((s) => {
-      const users = s.users.filter((u) => u.id !== id)
-      save(users)
-      return { users }
-    })
-    sbDelete(id)
+    set((s) => ({ users: s.users.filter((u) => u.id !== id) }))
+    void sbDelete(id)
     return { success: true }
   },
 }))

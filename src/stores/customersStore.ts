@@ -3,8 +3,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
 
-const STORAGE_KEY = 'aprinting_customers'
-
 export type AccountType = 'individual' | 'business'
 export type PaymentTerms = 'immediate' | 'net15' | 'net30' | 'net60'
 export type DiscountTier = 'none' | 'silver' | 'gold' | 'platinum'
@@ -53,6 +51,7 @@ export interface Customer {
 
 interface CustomersState {
   customers: Customer[]
+  loading: boolean
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'totalOrders' | 'totalSpent'>) => void
   updateCustomer: (id: string, updates: Partial<Customer>) => void
   deleteCustomer: (id: string) => void
@@ -193,34 +192,7 @@ function partialToSupabaseRow(updates: Partial<Customer>): Record<string, unknow
 }
 
 // ---------------------------------------------------------------------------
-// localStorage helpers (unchanged behaviour)
-// ---------------------------------------------------------------------------
-
-function migrate(customer: Record<string, unknown>): Customer {
-  const c = customer as unknown as Customer
-  if (!c.accountType) {
-    c.accountType = (c.company && c.vatNumber) ? 'business' : 'individual'
-  }
-  return c
-}
-
-function load(): Customer[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored) as Record<string, unknown>[]
-      return parsed.map(migrate)
-    }
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(customers: Customer[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(customers))
-}
-
-// ---------------------------------------------------------------------------
-// Supabase helpers (fire-and-forget — errors are logged, never thrown)
+// Supabase helpers
 // ---------------------------------------------------------------------------
 
 async function supabaseUpsert(customer: Customer) {
@@ -243,33 +215,26 @@ async function supabaseDelete(id: string) {
 async function fetchFromSupabase(
   set: (fn: (state: CustomersState) => Partial<CustomersState>) => void,
 ) {
-  if (!isSupabaseConfigured) return
+  set(() => ({ loading: true }))
+  if (!isSupabaseConfigured) {
+    set(() => ({ loading: false }))
+    return
+  }
   try {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
     if (error) {
       console.error('[customers] Supabase fetch failed:', error)
+      set(() => ({ loading: false }))
       return
     }
-    if (data && data.length > 0) {
-      const remote = (data as SupabaseCustomerRow[]).map(fromSupabaseRow)
-      set(() => {
-        save(remote)
-        return { customers: remote }
-      })
-    } else {
-      // Supabase is empty — push localStorage data up (initial sync)
-      const local = load()
-      if (local.length > 0) {
-        console.log(`[customers] Initial sync: pushing ${local.length} local customers to Supabase`)
-        for (const c of local) {
-          supabaseUpsert(c)
-        }
-      }
-    }
+    const rows = (data || []) as SupabaseCustomerRow[]
+    const customers = rows.map(fromSupabaseRow)
+    set(() => ({ customers, loading: false }))
   } catch (err) {
     console.error('[customers] Supabase fetch error:', err)
+    set(() => ({ loading: false }))
   }
 }
 
@@ -278,13 +243,14 @@ async function fetchFromSupabase(
 // ---------------------------------------------------------------------------
 
 export const useCustomersStore = create<CustomersState>((set, get) => {
-  // Kick off background Supabase sync after initial localStorage load
+  // Kick off initial Supabase fetch
   fetchFromSupabase(set)
 
   return {
-    customers: load(),
+    customers: [],
+    loading: true,
 
-    addCustomer: (data) => {
+    addCustomer: async (data) => {
       const customer: Customer = {
         ...data,
         id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -292,13 +258,8 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
         totalOrders: 0,
         totalSpent: 0,
       }
-      set((state) => {
-        const customers = [customer, ...state.customers]
-        save(customers)
-        return { customers }
-      })
-      // Fire-and-forget Supabase write
-      supabaseUpsert(customer)
+      set((state) => ({ customers: [customer, ...state.customers] }))
+      await supabaseUpsert(customer)
       // Auto-log activity
       useActivitiesStore.getState().addActivity({
         customerId: customer.id,
@@ -310,42 +271,34 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
       useAuditLogStore.getState().log('create', 'customer', `Customer "${customer.name}" created`, customer.email)
     },
 
-    updateCustomer: (id, updates) => {
-      set((state) => {
-        const customers = state.customers.map((c) =>
+    updateCustomer: async (id, updates) => {
+      set((state) => ({
+        customers: state.customers.map((c) =>
           c.id === id ? { ...c, ...updates } : c
-        )
-        save(customers)
-        return { customers }
-      })
-      // Fire-and-forget Supabase write
+        ),
+      }))
       if (isSupabaseConfigured) {
         const row = partialToSupabaseRow(updates)
-        supabase
+        const { error } = await supabase
           .from('customers')
           .update(row)
           .eq('id', id)
-          .then(({ error }) => {
-            if (error) console.error('[customers] Supabase update failed:', error)
-          })
+        if (error) console.error('[customers] Supabase update failed:', error)
       }
       const c = get().customers.find((c) => c.id === id)
       if (c) useAuditLogStore.getState().log('update', 'customer', `Customer "${c.name}" updated`, '', updates as Record<string, unknown>)
     },
 
-    deleteCustomer: (id) => {
+    deleteCustomer: async (id) => {
       const c = get().customers.find((c) => c.id === id)
       if (c) useAuditLogStore.getState().log('delete', 'customer', `Customer "${c.name}" deleted`, c.email)
-      set((state) => {
-        const customers = state.customers.filter((c) => c.id !== id)
-        save(customers)
-        return { customers }
-      })
-      // Fire-and-forget Supabase delete
-      supabaseDelete(id)
+      set((state) => ({
+        customers: state.customers.filter((c) => c.id !== id),
+      }))
+      await supabaseDelete(id)
     },
 
-    recordOrder: (email, name, phone, amount, address, city, postalCode) => {
+    recordOrder: async (email, name, phone, amount, address, city, postalCode) => {
       const existing = get().customers.find((c) => c.email.toLowerCase() === email.toLowerCase())
       if (existing) {
         const updatedCustomer: Customer = {
@@ -359,15 +312,12 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
           totalSpent: existing.totalSpent + amount,
           lastOrderAt: new Date().toISOString(),
         }
-        set((state) => {
-          const customers = state.customers.map((c) =>
+        set((state) => ({
+          customers: state.customers.map((c) =>
             c.id === existing.id ? updatedCustomer : c
-          )
-          save(customers)
-          return { customers }
-        })
-        // Fire-and-forget Supabase write
-        supabaseUpsert(updatedCustomer)
+          ),
+        }))
+        await supabaseUpsert(updatedCustomer)
         // Auto-log activity
         useActivitiesStore.getState().addActivity({
           customerId: existing.id,
@@ -392,13 +342,8 @@ export const useCustomersStore = create<CustomersState>((set, get) => {
           createdAt: new Date().toISOString(),
           lastOrderAt: new Date().toISOString(),
         }
-        set((state) => {
-          const customers = [customer, ...state.customers]
-          save(customers)
-          return { customers }
-        })
-        // Fire-and-forget Supabase write
-        supabaseUpsert(customer)
+        set((state) => ({ customers: [customer, ...state.customers] }))
+        await supabaseUpsert(customer)
       }
     },
 

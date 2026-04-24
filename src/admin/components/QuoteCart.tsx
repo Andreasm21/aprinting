@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ShoppingCart, X, Minus, Plus, FileText, Trash2 } from 'lucide-react'
+import { ShoppingCart, X, Minus, Plus, FileText, Trash2, Calculator } from 'lucide-react'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 import QuoteCustomerPickerModal from './QuoteCustomerPickerModal'
+import PrintJobCalculatorModal from './PrintJobCalculatorModal'
 
 export default function QuoteCart() {
   const items = useQuoteCartStore((s) => s.items)
@@ -12,6 +13,7 @@ export default function QuoteCart() {
   const openCart = useQuoteCartStore((s) => s.openCart)
   const closeCart = useQuoteCartStore((s) => s.closeCart)
   const [showCustomerPicker, setShowCustomerPicker] = useState(false)
+  const [showCalculator, setShowCalculator] = useState(false)
 
   const totalCount = items.reduce((s, i) => s + i.quantity, 0)
   const subtotal = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
@@ -51,6 +53,16 @@ export default function QuoteCart() {
               </div>
               <button onClick={closeCart} className="p-1 hover:bg-bg-tertiary rounded">
                 <X size={18} className="text-text-muted" />
+              </button>
+            </div>
+
+            {/* Quick add a custom print job */}
+            <div className="px-4 pt-3">
+              <button
+                onClick={() => setShowCalculator(true)}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-2 rounded-lg border border-dashed border-border hover:border-accent-amber transition-all"
+              >
+                <Calculator size={12} /> + Print Job (calculate price)
               </button>
             </div>
 
@@ -158,6 +170,10 @@ export default function QuoteCart() {
         <QuoteCustomerPickerModal
           onClose={() => setShowCustomerPicker(false)}
         />
+      )}
+
+      {showCalculator && (
+        <PrintJobCalculatorModal onClose={() => setShowCalculator(false)} />
       )}
     </>
   )

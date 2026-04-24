@@ -163,7 +163,7 @@ export default function AdminUserFormModal({
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="input-field text-sm"
-              placeholder="andreas@axiom3d.cy"
+              placeholder="andreas@axiomcreate.com"
             />
           </div>
 

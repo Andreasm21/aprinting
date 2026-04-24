@@ -1,9 +1,10 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Calculator } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 
 export default function AdminPricing() {
   const { content, updatePricingRow, addPricingRow, deletePricingRow, updateContent } = useContentStore()
   const pricing = content.pricing
+  const pp = content.printPricing
 
   return (
     <div>
@@ -81,6 +82,77 @@ export default function AdminPricing() {
           <div className="max-w-xs">
             <label className="block font-mono text-xs text-text-muted uppercase mb-1">Design Assistance Rate (per hour)</label>
             <input value={pricing.designRate} onChange={(e) => updateContent('pricing', { designRate: e.target.value })} className="input-field text-sm" />
+          </div>
+        </div>
+
+        {/* Print Job Pricing — used by the calculator */}
+        <div className="card-base p-5">
+          <h3 className="font-mono text-sm font-bold text-accent-amber uppercase tracking-wider mb-2 flex items-center gap-2">
+            <Calculator size={14} /> Print Job Calculator Defaults
+          </h3>
+          <p className="text-text-muted text-xs mb-4">These rates power the per-job price calculator (Quote Cart → + Print Job).</p>
+
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Electricity (€/kWh)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={pp.electricityRate}
+                onChange={(e) => updateContent('printPricing', { electricityRate: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Labour (€/hr)</label>
+              <input
+                type="number"
+                step="0.5"
+                value={pp.labourRate}
+                onChange={(e) => updateContent('printPricing', { labourRate: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Depreciation (€/hr)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={pp.depreciationRate}
+                onChange={(e) => updateContent('printPricing', { depreciationRate: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Profit Markup (%)</label>
+              <input
+                type="number"
+                step="1"
+                value={pp.profitMarkup}
+                onChange={(e) => updateContent('printPricing', { profitMarkup: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Power Draw (kW)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={pp.defaultPowerDraw}
+                onChange={(e) => updateContent('printPricing', { defaultPowerDraw: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Default Labour (hours)</label>
+              <input
+                type="number"
+                step="0.25"
+                value={pp.defaultLabourHours}
+                onChange={(e) => updateContent('printPricing', { defaultLabourHours: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
-const STORAGE_KEY = 'axiom_audit_log'
 const MAX_LOCAL_ENTRIES = 500
 
 export type AuditCategory =
@@ -36,24 +35,11 @@ export interface AuditEntry {
 
 interface AuditLogState {
   entries: AuditEntry[]
-  log: (action: AuditAction, category: AuditCategory, label: string, detail?: string, metadata?: Record<string, unknown>) => void
+  loading: boolean
+  log: (action: AuditAction, category: AuditCategory, label: string, detail?: string, metadata?: Record<string, unknown>) => Promise<void>
   getRecent: (limit?: number) => AuditEntry[]
   getByCategory: (category: AuditCategory) => AuditEntry[]
-  clearAll: () => void
-}
-
-// localStorage helpers
-function load(): AuditEntry[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(entries: AuditEntry[]) {
-  // Keep only latest entries to avoid bloat
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_LOCAL_ENTRIES)))
+  clearAll: () => Promise<void>
 }
 
 // Supabase helpers
@@ -105,7 +91,11 @@ async function sbInsert(entry: AuditEntry) {
 }
 
 async function fetchFromSupabase(): Promise<void> {
-  if (!isSupabaseConfigured) return
+  if (!isSupabaseConfigured) {
+    useAuditLogStore.setState({ loading: false })
+    return
+  }
+  useAuditLogStore.setState({ loading: true })
   try {
     const { data, error } = await supabase
       .from('audit_log')
@@ -114,20 +104,14 @@ async function fetchFromSupabase(): Promise<void> {
       .limit(MAX_LOCAL_ENTRIES)
     if (error) {
       console.error('[audit] Supabase fetch error:', error)
+      useAuditLogStore.setState({ loading: false })
       return
     }
-    if (data && data.length > 0) {
-      const entries = (data as SbRow[]).map(fromRow)
-      save(entries)
-      useAuditLogStore.setState({ entries })
-    } else {
-      const local = load()
-      if (local.length > 0) {
-        for (const e of local) await sbInsert(e)
-      }
-    }
+    const entries = ((data || []) as SbRow[]).map(fromRow)
+    useAuditLogStore.setState({ entries, loading: false })
   } catch (err) {
     console.error('[audit] Supabase fetch exception:', err)
+    useAuditLogStore.setState({ loading: false })
   }
 }
 
@@ -135,13 +119,14 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => {
   fetchFromSupabase()
 
   return {
-    entries: load(),
+    entries: [],
+    loading: true,
 
-    log: (action, category, label, detail = '', metadata = {}) => {
-      // Lazily import to avoid circular dep
+    log: async (action, category, label, detail = '', metadata = {}) => {
+      // Lazily read the admin auth context from the window so we can attribute
+      // the log entry without creating a circular import.
       let actor: string | undefined
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const adminAuth = (window as unknown as { __axiomAdminAuth?: { username?: string } }).__axiomAdminAuth
         actor = adminAuth?.username
       } catch { /* ignore */ }
@@ -155,21 +140,25 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => {
         actor,
         createdAt: new Date().toISOString(),
       }
-      set((state) => {
-        const entries = [entry, ...state.entries].slice(0, MAX_LOCAL_ENTRIES)
-        save(entries)
-        return { entries }
-      })
-      sbInsert(entry)
+      set((state) => ({
+        entries: [entry, ...state.entries].slice(0, MAX_LOCAL_ENTRIES),
+      }))
+      await sbInsert(entry)
     },
 
     getRecent: (limit = 20) => get().entries.slice(0, limit),
 
     getByCategory: (category) => get().entries.filter((e) => e.category === category),
 
-    clearAll: () => {
-      localStorage.removeItem(STORAGE_KEY)
+    clearAll: async () => {
       set({ entries: [] })
+      if (!isSupabaseConfigured) return
+      try {
+        const { error } = await supabase.from('audit_log').delete().neq('id', '')
+        if (error) console.error('[audit] Supabase clearAll error:', error)
+      } catch (err) {
+        console.error('[audit] Supabase clearAll exception:', err)
+      }
     },
   }
 })

@@ -72,7 +72,7 @@ Cyprus 🇨🇾
 
 ---
 Axiom — From Digital to Physical
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
     gr: {
       subject: 'Καλώς ήρθατε στην Axiom! 🎉',
@@ -95,7 +95,7 @@ hello@axiom3d.cy`,
 
 ---
 Axiom — Από το Ψηφιακό στο Φυσικό
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
   },
   order_confirmed: {
@@ -128,7 +128,7 @@ The Axiom Team
 
 ---
 Axiom — From Digital to Physical
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
     gr: {
       subject: 'Επιβεβαίωση Παραγγελίας — {{orderNumber}}',
@@ -159,7 +159,7 @@ hello@axiom3d.cy`,
 
 ---
 Axiom — Από το Ψηφιακό στο Φυσικό
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
   },
   order_ready: {
@@ -188,7 +188,7 @@ The Axiom Team
 
 ---
 Axiom — From Digital to Physical
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
     gr: {
       subject: 'Η Παραγγελία σας είναι Έτοιμη! — {{orderNumber}}',
@@ -215,7 +215,7 @@ hello@axiom3d.cy`,
 
 ---
 Axiom — Από το Ψηφιακό στο Φυσικό
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
   },
   shipped: {
@@ -243,7 +243,7 @@ The Axiom Team
 
 ---
 Axiom — From Digital to Physical
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
     gr: {
       subject: 'Η Παραγγελία σας Απεστάλη! — {{orderNumber}}',
@@ -269,7 +269,7 @@ hello@axiom3d.cy`,
 
 ---
 Axiom — Από το Ψηφιακό στο Φυσικό
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
   },
   quote_ready: {
@@ -301,7 +301,7 @@ The Axiom Team
 
 ---
 Axiom — From Digital to Physical
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
     gr: {
       subject: 'Η Προσφορά σας είναι Έτοιμη — {{quoteRef}}',
@@ -331,7 +331,7 @@ hello@axiom3d.cy`,
 
 ---
 Axiom — Από το Ψηφιακό στο Φυσικό
-hello@axiom3d.cy`,
+team@axiomcreate.com`,
     },
   },
 }

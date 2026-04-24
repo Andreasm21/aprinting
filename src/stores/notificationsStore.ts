@@ -2,8 +2,6 @@ import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
 
-const STORAGE_KEY = 'aprinting_notifications'
-
 export type NotificationType = 'order' | 'part_request' | 'contact'
 
 export interface OrderNotification {
@@ -70,30 +68,15 @@ export type Notification = OrderNotification | PartRequestNotification | Contact
 
 interface NotificationsState {
   notifications: Notification[]
-  addOrder: (order: Omit<OrderNotification, 'type' | 'id' | 'date' | 'read'>) => void
-  addPartRequest: (request: Omit<PartRequestNotification, 'type' | 'id' | 'date' | 'read'>) => void
-  addContact: (contact: Omit<ContactNotification, 'type' | 'id' | 'date' | 'read'>) => void
-  markRead: (id: string) => void
-  markAllRead: () => void
-  deleteNotification: (id: string) => void
-  clearAll: () => void
+  loading: boolean
+  addOrder: (order: Omit<OrderNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
+  addPartRequest: (request: Omit<PartRequestNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
+  addContact: (contact: Omit<ContactNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
+  markRead: (id: string) => Promise<void>
+  markAllRead: () => Promise<void>
+  deleteNotification: (id: string) => Promise<void>
+  clearAll: () => Promise<void>
   getUnreadCount: () => number
-}
-
-// ---------------------------------------------------------------------------
-// localStorage helpers (cache / fallback)
-// ---------------------------------------------------------------------------
-
-function loadNotifications(): Notification[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(notifications: Notification[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications))
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +105,7 @@ function fromSupabaseRow(row: SupabaseNotificationRow): Notification {
 }
 
 // ---------------------------------------------------------------------------
-// Supabase fire-and-forget helpers
+// Supabase helpers
 // ---------------------------------------------------------------------------
 
 async function sbUpsert(notification: Notification) {
@@ -177,7 +160,11 @@ async function sbDeleteAll() {
 async function fetchFromSupabase(
   set: (partial: Partial<NotificationsState>) => void,
 ) {
-  if (!isSupabaseConfigured) return
+  if (!isSupabaseConfigured) {
+    set({ loading: false })
+    return
+  }
+  set({ loading: true })
   try {
     const { data, error } = await supabase
       .from('notifications')
@@ -186,25 +173,16 @@ async function fetchFromSupabase(
 
     if (error) {
       console.error('[notifications] Supabase fetch failed:', error)
+      set({ loading: false })
       return
     }
 
-    if (data && data.length > 0) {
-      const notifications = (data as SupabaseNotificationRow[]).map(fromSupabaseRow)
-      save(notifications)
-      set({ notifications })
-    } else {
-      // Supabase is empty — push localStorage data up (initial sync)
-      const local = loadNotifications()
-      if (local.length > 0) {
-        console.log(`[notifications] Initial sync: pushing ${local.length} local notifications to Supabase`)
-        for (const n of local) {
-          sbUpsert(n)
-        }
-      }
-    }
+    const rows = (data || []) as SupabaseNotificationRow[]
+    const notifications = rows.map(fromSupabaseRow)
+    set({ notifications, loading: false })
   } catch (err) {
     console.error('[notifications] Supabase fetch exception:', err)
+    set({ loading: false })
   }
 }
 
@@ -214,13 +192,13 @@ async function fetchFromSupabase(
 
 export const useNotificationsStore = create<NotificationsState>((set, get) => {
   // Kick off a Supabase fetch as soon as the store is created.
-  // The localStorage data is loaded synchronously below so the UI is never empty.
   fetchFromSupabase(set)
 
   return {
-    notifications: loadNotifications(),
+    notifications: [],
+    loading: true,
 
-    addOrder: (order) => {
+    addOrder: async (order) => {
       const notification: OrderNotification = {
         ...order,
         type: 'order',
@@ -228,16 +206,12 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         date: new Date().toISOString(),
         read: false,
       }
-      set((state) => {
-        const notifications = [notification, ...state.notifications]
-        save(notifications)
-        return { notifications }
-      })
-      sbUpsert(notification)
+      set((state) => ({ notifications: [notification, ...state.notifications] }))
+      await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New order received`, `€${notification.total.toFixed(2)} — ${notification.customer.name}`)
     },
 
-    addPartRequest: (request) => {
+    addPartRequest: async (request) => {
       const notification: PartRequestNotification = {
         ...request,
         type: 'part_request',
@@ -245,16 +219,12 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         date: new Date().toISOString(),
         read: false,
       }
-      set((state) => {
-        const notifications = [notification, ...state.notifications]
-        save(notifications)
-        return { notifications }
-      })
-      sbUpsert(notification)
+      set((state) => ({ notifications: [notification, ...state.notifications] }))
+      await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New part request received`, `${notification.details.partName} — ${notification.business.contactName}`)
     },
 
-    addContact: (contact) => {
+    addContact: async (contact) => {
       const notification: ContactNotification = {
         ...contact,
         type: 'contact',
@@ -262,51 +232,40 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
         date: new Date().toISOString(),
         read: false,
       }
-      set((state) => {
-        const notifications = [notification, ...state.notifications]
-        save(notifications)
-        return { notifications }
-      })
-      sbUpsert(notification)
+      set((state) => ({ notifications: [notification, ...state.notifications] }))
+      await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New contact message`, `From ${notification.name}`)
     },
 
-    markRead: (id) => {
-      set((state) => {
-        const notifications = state.notifications.map((n) =>
+    markRead: async (id) => {
+      set((state) => ({
+        notifications: state.notifications.map((n) =>
           n.id === id ? { ...n, read: true } : n
-        )
-        save(notifications)
-        return { notifications }
-      })
-      sbUpdate(id, { read: true })
+        ),
+      }))
+      await sbUpdate(id, { read: true })
     },
 
-    markAllRead: () => {
-      set((state) => {
-        const notifications = state.notifications.map((n) => ({ ...n, read: true }))
-        save(notifications)
-        return { notifications }
-      })
-      sbUpdateAll({ read: true })
+    markAllRead: async () => {
+      set((state) => ({
+        notifications: state.notifications.map((n) => ({ ...n, read: true })),
+      }))
+      await sbUpdateAll({ read: true })
     },
 
-    deleteNotification: (id) => {
+    deleteNotification: async (id) => {
       const n = get().notifications.find((n) => n.id === id)
       if (n) useAuditLogStore.getState().log('delete', 'notification', `Notification deleted`, n.type)
-      set((state) => {
-        const notifications = state.notifications.filter((n) => n.id !== id)
-        save(notifications)
-        return { notifications }
-      })
-      sbDelete(id)
+      set((state) => ({
+        notifications: state.notifications.filter((n) => n.id !== id),
+      }))
+      await sbDelete(id)
     },
 
-    clearAll: () => {
+    clearAll: async () => {
       const count = get().notifications.length
-      localStorage.removeItem(STORAGE_KEY)
       set({ notifications: [] })
-      sbDeleteAll()
+      await sbDeleteAll()
       if (count > 0) useAuditLogStore.getState().log('delete', 'notification', `All notifications cleared`, `${count} removed`)
     },
 

@@ -41,6 +41,7 @@ const InventoryMovements = lazy(() => import('@/admin/inventory/InventoryMovemen
 const InventoryScan = lazy(() => import('@/admin/inventory/InventoryScan'))
 const InventoryReports = lazy(() => import('@/admin/inventory/InventoryReports'))
 const InventoryOrders = lazy(() => import('@/admin/inventory/InventoryOrders'))
+const InventoryQueue = lazy(() => import('@/admin/inventory/InventoryQueue'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -110,6 +111,7 @@ function App() {
         <Route path="/admin/inventory/scan" element={<AdminLoader><InventoryScan /></AdminLoader>} />
         <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
         <Route path="/admin/inventory/orders" element={<AdminLoader><InventoryOrders /></AdminLoader>} />
+        <Route path="/admin/inventory/queue" element={<AdminLoader><InventoryQueue /></AdminLoader>} />
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />

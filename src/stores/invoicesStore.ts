@@ -6,7 +6,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
 
-const STORAGE_KEY = 'aprinting_invoices'
 export const CYPRUS_VAT_RATE = 0.19
 
 export type DocumentType = 'invoice' | 'quotation'
@@ -58,6 +57,7 @@ export interface Invoice {
 
 interface InvoicesState {
   invoices: Invoice[]
+  loading: boolean
   addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => string
   updateInvoice: (id: string, updates: Partial<Invoice>) => void
   deleteInvoice: (id: string) => void
@@ -65,22 +65,6 @@ interface InvoicesState {
   convertToInvoice: (quotationId: string) => string | null
   createFromOrder: (orderId: string) => string | null
   createQuotationFromPartRequest: (requestId: string) => string | null
-}
-
-// ---------------------------------------------------------------------------
-// localStorage helpers
-// ---------------------------------------------------------------------------
-
-function load(): Invoice[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(invoices: Invoice[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices))
 }
 
 // ---------------------------------------------------------------------------
@@ -130,32 +114,28 @@ function rowToInvoice(row: Record<string, unknown>): Invoice {
 }
 
 // ---------------------------------------------------------------------------
-// Supabase helpers (fire-and-forget — errors are logged, never thrown)
+// Supabase helpers
 // ---------------------------------------------------------------------------
 
 async function upsertToSupabase(invoice: Invoice): Promise<void> {
   if (!isSupabaseConfigured) return
-  try {
-    const row = invoiceToRow(invoice)
-    const { error } = await supabase.from('documents').upsert(row, { onConflict: 'id' })
-    if (error) console.error('[invoicesStore] Supabase upsert error:', error)
-  } catch (err) {
-    console.error('[invoicesStore] Supabase upsert exception:', err)
-  }
+  const row = invoiceToRow(invoice)
+  const { error } = await supabase.from('documents').upsert(row, { onConflict: 'id' })
+  if (error) throw error
 }
 
 async function deleteFromSupabase(id: string): Promise<void> {
   if (!isSupabaseConfigured) return
-  try {
-    const { error } = await supabase.from('documents').delete().eq('id', id)
-    if (error) console.error('[invoicesStore] Supabase delete error:', error)
-  } catch (err) {
-    console.error('[invoicesStore] Supabase delete exception:', err)
-  }
+  const { error } = await supabase.from('documents').delete().eq('id', id)
+  if (error) throw error
 }
 
 async function fetchFromSupabase(): Promise<void> {
-  if (!isSupabaseConfigured) return
+  useInvoicesStore.setState({ loading: true })
+  if (!isSupabaseConfigured) {
+    useInvoicesStore.setState({ loading: false })
+    return
+  }
   try {
     const { data, error } = await supabase
       .from('documents')
@@ -163,25 +143,14 @@ async function fetchFromSupabase(): Promise<void> {
       .order('created_at', { ascending: false })
     if (error) {
       console.error('[invoicesStore] Supabase fetch error:', error)
+      useInvoicesStore.setState({ loading: false })
       return
     }
-    if (data && data.length > 0) {
-      // Supabase has data — use it as source of truth
-      const invoices = data.map((row) => rowToInvoice(row as Record<string, unknown>))
-      save(invoices)
-      useInvoicesStore.setState({ invoices })
-    } else {
-      // Supabase is empty — push localStorage data up (initial sync)
-      const local = load()
-      if (local.length > 0) {
-        console.log(`[invoicesStore] Initial sync: pushing ${local.length} local documents to Supabase`)
-        for (const inv of local) {
-          await upsertToSupabase(inv)
-        }
-      }
-    }
+    const rows = (data || []) as Record<string, unknown>[]
+    useInvoicesStore.setState({ invoices: rows.map(rowToInvoice), loading: false })
   } catch (err) {
     console.error('[invoicesStore] Supabase fetch exception:', err)
+    useInvoicesStore.setState({ loading: false })
   }
 }
 
@@ -216,7 +185,8 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
   fetchFromSupabase()
 
   return {
-    invoices: load(),
+    invoices: [],
+    loading: true,
 
     addInvoice: (data) => {
       const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -225,13 +195,16 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         id,
         createdAt: new Date().toISOString(),
       }
-      set((state) => {
-        const invoices = [invoice, ...state.invoices]
-        save(invoices)
-        return { invoices }
-      })
-      // Fire-and-forget Supabase sync
-      upsertToSupabase(invoice)
+      // Push to local state immediately for snappy UX
+      set((state) => ({ invoices: [invoice, ...state.invoices] }))
+      // Sync to Supabase (state already updated; log error if it fails)
+      void (async () => {
+        try {
+          await upsertToSupabase(invoice)
+        } catch (err) {
+          console.error('[invoicesStore] addInvoice Supabase error:', err)
+        }
+      })()
       // Auto-log activity
       if (data.customerId) {
         const typeLabel = data.type === 'quotation' ? 'Quotation' : 'Invoice'
@@ -258,12 +231,17 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
           }
           return inv
         })
-        save(invoices)
         return { invoices }
       })
-      // Fire-and-forget Supabase sync
       if (updated) {
-        upsertToSupabase(updated)
+        const updatedInvoice = updated
+        void (async () => {
+          try {
+            await upsertToSupabase(updatedInvoice)
+          } catch (err) {
+            console.error('[invoicesStore] updateInvoice Supabase error:', err)
+          }
+        })()
         if (updates.status) {
           const cat = updated.type === 'quotation' ? 'quotation' as const : 'invoice' as const
           useAuditLogStore.getState().log('status_change', cat, `${updated.documentNumber} → ${updates.status}`, updated.customerName)
@@ -280,12 +258,14 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         const cat = doc.type === 'quotation' ? 'quotation' as const : 'invoice' as const
         useAuditLogStore.getState().log('delete', cat, `${doc.documentNumber} deleted`, doc.customerName)
       }
-      set((state) => {
-        const invoices = state.invoices.filter((inv) => inv.id !== id)
-        save(invoices)
-        return { invoices }
-      })
-      deleteFromSupabase(id)
+      set((state) => ({ invoices: state.invoices.filter((inv) => inv.id !== id) }))
+      void (async () => {
+        try {
+          await deleteFromSupabase(id)
+        } catch (err) {
+          console.error('[invoicesStore] deleteInvoice Supabase error:', err)
+        }
+      })()
     },
 
     getNextNumber: (type) => {
