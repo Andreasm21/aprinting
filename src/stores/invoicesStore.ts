@@ -16,7 +16,10 @@ export interface InvoiceLineItem {
   material?: string
   weightGrams?: number
   ratePerGram?: number
-  hours?: number       // print + labour time used for electricity/labour/depreciation calc
+  /** @deprecated use printHours + labourHours separately. Kept for legacy reads. */
+  hours?: number
+  printHours?: number   // printer running time → drives electricity + depreciation
+  labourHours?: number  // human work time → drives labour cost
   unitPrice: number
   quantity: number
   total: number

@@ -15,7 +15,6 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
   const inventoryProducts = useInventoryStore((s) => s.products)
   const printPricing = useContentStore((s) => s.content.printPricing)
 
-  // Locked rates pulled from admin pricing settings.
   const { electricityRate, labourRate, depreciationRate, profitMarkup, defaultPowerDraw, defaultLabourHours } = printPricing
 
   // Build material list from inventory: only material spools (not Hardware/Finished)
@@ -33,27 +32,39 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
       }
     })
 
-  // Apply COGS formula: Material + Electricity + Labour + Depreciation, then × (1 + markup)
-  const calcUnitPrice = (weightGrams: number, ratePerGram: number, hours: number) => {
+  /**
+   * COGS formula (matches the spreadsheet):
+   *   Material      = weightGrams × ratePerGram
+   *   Electricity   = printHours × powerDraw(kW) × electricityRate(€/kWh)
+   *   Labour        = labourHours × labourRate(€/hr)
+   *   Depreciation  = printHours × depreciationRate(€/hr)
+   *   COGS = sum
+   *   Price to Sell = COGS × (1 + markup%)
+   */
+  const calcUnitPrice = (weightGrams: number, ratePerGram: number, printHours: number, labourHours: number) => {
     const material = weightGrams * ratePerGram
-    const electricity = hours * defaultPowerDraw * electricityRate
-    const labour = hours * labourRate
-    const depreciation = hours * depreciationRate
+    const electricity = printHours * defaultPowerDraw * electricityRate
+    const labour = labourHours * labourRate
+    const depreciation = printHours * depreciationRate
     const cogs = material + electricity + labour + depreciation
     return cogs * (1 + profitMarkup / 100)
   }
+
+  // Read print/labour hours, falling back to legacy `hours` field, then defaults.
+  const getPrintHours = (it: InvoiceLineItem) => it.printHours ?? it.hours ?? 0
+  const getLabourHours = (it: InvoiceLineItem) => it.labourHours ?? defaultLabourHours
 
   const update = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const next = [...items]
     const item = { ...next[index], [field]: value }
 
-    // recalc unit price using the formula whenever material inputs change.
-    // Use ?? not || so an explicit hours=0 stays 0 (user wants no labour cost).
-    if (showMaterialFields && (field === 'weightGrams' || field === 'ratePerGram' || field === 'hours')) {
+    // Recalc unit price using the formula whenever a formula input changes.
+    if (showMaterialFields && (field === 'weightGrams' || field === 'ratePerGram' || field === 'printHours' || field === 'labourHours')) {
       const w = Number(item.weightGrams) || 0
       const r = Number(item.ratePerGram) || 0
-      const h = item.hours ?? defaultLabourHours
-      item.unitPrice = calcUnitPrice(w, r, h)
+      const ph = Number(getPrintHours(item)) || 0
+      const lh = Number(getLabourHours(item)) || 0
+      item.unitPrice = calcUnitPrice(w, r, ph, lh)
     }
     item.total = item.unitPrice * item.quantity
 
@@ -62,13 +73,17 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
   }
 
   const addRow = () => {
-    onChange([...items, {
-      description: '',
-      unitPrice: 0,
-      quantity: 1,
-      total: 0,
-      hours: defaultLabourHours,
-    }])
+    onChange([
+      ...items,
+      {
+        description: '',
+        unitPrice: 0,
+        quantity: 1,
+        total: 0,
+        printHours: 0,
+        labourHours: defaultLabourHours,
+      },
+    ])
   }
 
   const removeRow = (index: number) => {
@@ -80,18 +95,19 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     if (!mat) return
     const next = [...items]
     const item = { ...next[index], material: materialLabel, ratePerGram: mat.rate }
-    const h = item.hours ?? defaultLabourHours
     if (item.weightGrams) {
-      item.unitPrice = calcUnitPrice(item.weightGrams, mat.rate, h)
+      const ph = Number(getPrintHours(item)) || 0
+      const lh = Number(getLabourHours(item)) || 0
+      item.unitPrice = calcUnitPrice(item.weightGrams, mat.rate, ph, lh)
       item.total = item.unitPrice * item.quantity
     }
     next[index] = item
     onChange(next)
   }
 
-  // Columns: Description | Material | Weight | Hours | Rate/g | Unit € | Qty | Total | ✕
+  // Columns: Description | Material | Weight | Print h | Labour h | Unit € | Qty | Total | ✕  (9 cols)
   const gridCols = showMaterialFields
-    ? 'grid-cols-[minmax(0,1fr)_120px_70px_60px_70px_80px_50px_80px_30px]'
+    ? 'grid-cols-[minmax(0,1fr)_120px_70px_60px_60px_80px_50px_80px_30px]'
     : 'grid-cols-[minmax(0,1fr)_90px_60px_80px_30px]'
 
   return (
@@ -100,24 +116,24 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
       {showMaterialFields && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-text-muted bg-bg-tertiary/50 border border-border rounded px-3 py-2">
           <span className="flex items-center gap-1 text-accent-amber">
-            <Lock size={10} /> FORMULA INPUTS (editable in Admin → Pricing)
+            <Lock size={10} /> FORMULA (editable in Admin → Pricing)
           </span>
           <span>Power: <strong className="text-text-primary">{(defaultPowerDraw * 1000).toFixed(0)} W</strong></span>
           <span>Electricity: <strong className="text-text-primary">€{electricityRate.toFixed(2)}/kWh</strong></span>
           <span>Labour: <strong className="text-text-primary">€{labourRate.toFixed(2)}/hr</strong></span>
           <span>Depreciation: <strong className="text-text-primary">€{depreciationRate.toFixed(2)}/hr</strong></span>
-          <span>Markup: <strong className="text-text-primary">+{profitMarkup}%</strong></span>
+          <span>Markup: <strong className="text-accent-amber">+{profitMarkup}%</strong></span>
         </div>
       )}
 
-      {/* Header — aligned with inputs below */}
+      {/* Header */}
       <div className={`grid gap-2 text-[10px] font-mono uppercase text-text-muted ${gridCols}`}>
         <span>Description</span>
         {showMaterialFields && <span>Material</span>}
         {showMaterialFields && <span className="text-right">Weight (g)</span>}
-        {showMaterialFields && <span className="text-right">Hours</span>}
-        {showMaterialFields && <span className="text-right">Rate €/g</span>}
-        <span className="text-right">Unit Price €</span>
+        {showMaterialFields && <span className="text-right" title="Printer running time — drives electricity + depreciation">Print h</span>}
+        {showMaterialFields && <span className="text-right" title="Human work time — drives labour cost">Labour h</span>}
+        <span className="text-right">Unit € <span className="text-accent-amber">*</span></span>
         <span className="text-right">Qty</span>
         <span className="text-right">Total €</span>
         <span />
@@ -161,22 +177,23 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
           {showMaterialFields && (
             <input
               type="number"
-              step="0.25"
+              step="0.5"
               min={0}
-              value={item.hours ?? defaultLabourHours}
-              onChange={(e) => update(i, 'hours', parseFloat(e.target.value) || 0)}
+              value={getPrintHours(item) || ''}
+              onChange={(e) => update(i, 'printHours', parseFloat(e.target.value) || 0)}
               className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary text-right focus:border-accent-amber focus:outline-none"
-              title="Print + labour time (used for electricity/labour/depreciation)"
+              title="Printer running time (hours)"
             />
           )}
           {showMaterialFields && (
             <input
               type="number"
-              step="0.01"
+              step="0.25"
               min={0}
-              value={item.ratePerGram ?? ''}
-              onChange={(e) => update(i, 'ratePerGram', parseFloat(e.target.value) || 0)}
+              value={getLabourHours(item) ?? ''}
+              onChange={(e) => update(i, 'labourHours', parseFloat(e.target.value) || 0)}
               className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary text-right focus:border-accent-amber focus:outline-none"
+              title="Human work time (hours)"
             />
           )}
           <input
@@ -201,6 +218,12 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
           </button>
         </div>
       ))}
+
+      {showMaterialFields && (
+        <p className="text-[10px] font-mono text-text-muted">
+          <span className="text-accent-amber">*</span> Unit € auto-fills from the formula: (material + electricity + labour + depreciation) × markup. Editable for manual overrides.
+        </p>
+      )}
 
       <button type="button" onClick={addRow} className="flex items-center gap-1.5 text-xs font-mono text-accent-amber hover:text-accent-amber/80 mt-2">
         <Plus size={12} /> Add Line Item
