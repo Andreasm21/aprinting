@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Search, Edit3, Trash2, Package, QrCode, FileText, X, AlertTriangle } from 'lucide-react'
 import { useInventoryStore, CATEGORIES, type InventoryProduct, type InventoryCategory, type StockStatus } from '@/stores/inventoryStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
+import { useContentStore } from '@/stores/contentStore'
 import InventoryLayout from './InventoryLayout'
 import InventoryProductFormModal from './InventoryProductFormModal'
 import InventoryLabelModal from './InventoryLabelModal'
@@ -20,6 +21,7 @@ export default function InventoryProducts() {
   const addMovement = useInventoryStore((s) => s.addMovement)
   const getQtyOnHand = useInventoryStore((s) => s.getQtyOnHand)
   const getStockStatus = useInventoryStore((s) => s.getStockStatus)
+  const profitMarkup = useContentStore((s) => s.content.printPricing.profitMarkup)
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<'all' | InventoryCategory>('all')
@@ -37,12 +39,14 @@ export default function InventoryProducts() {
     // — no brand. For Hardware/Finished items keep the descriptive name.
     const isFilament = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'].includes(p.category)
     const desc = isFilament ? p.category : `${p.partNumber} — ${p.name}`
+    // Apply profit markup to inventory cost when adding to a quote.
+    const priceWithMarkup = p.price * (1 + profitMarkup / 100)
     addToQuoteCart({
       source: 'inventory',
       productId: p.id,
       partNumber: p.partNumber,
       description: desc,
-      unitPrice: p.price,
+      unitPrice: priceWithMarkup,
       material: p.category,
     })
     setJustQuoted(p.id)
