@@ -17,6 +17,7 @@ export default function InventoryProducts() {
   const addProduct = useInventoryStore((s) => s.addProduct)
   const updateProduct = useInventoryStore((s) => s.updateProduct)
   const deleteProduct = useInventoryStore((s) => s.deleteProduct)
+  const addMovement = useInventoryStore((s) => s.addMovement)
   const getQtyOnHand = useInventoryStore((s) => s.getQtyOnHand)
   const getStockStatus = useInventoryStore((s) => s.getStockStatus)
 
@@ -261,7 +262,19 @@ export default function InventoryProducts() {
       {adding && (
         <InventoryProductFormModal
           title="Add Product"
-          onSave={(data) => { addProduct(data); setAdding(false) }}
+          onSave={(data, initialQty) => {
+            const id = addProduct(data)
+            if (initialQty && initialQty > 0) {
+              addMovement({
+                productId: id,
+                type: 'IN',
+                qty: initialQty,
+                unitCost: data.cost,
+                notes: 'Initial stock',
+              })
+            }
+            setAdding(false)
+          }}
           onClose={() => setAdding(false)}
         />
       )}

@@ -10,6 +10,7 @@ interface FormData {
   costPerKg: number
   bin: string
   barcode: string
+  initialQty: number
 }
 
 // Generate a unique part number from brand + category + 4 random chars
@@ -27,7 +28,7 @@ export default function InventoryProductFormModal({
   title,
 }: {
   initial?: InventoryProduct
-  onSave: (data: Omit<InventoryProduct, 'id' | 'createdAt' | 'updatedAt'>) => void
+  onSave: (data: Omit<InventoryProduct, 'id' | 'createdAt' | 'updatedAt'>, initialQty?: number) => void
   onClose: () => void
   title: string
 }) {
@@ -44,26 +45,31 @@ export default function InventoryProductFormModal({
     costPerKg: initialCostPerKg,
     bin: initial?.bin || '',
     barcode: initial?.barcode || '',
+    initialQty: 1,
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // We standardize on cost per kg. Store as cost (per kg) with unitWeightGrams=1000
     // so the calculator math (cost / unitWeightGrams = cost/g) works correctly.
-    onSave({
-      partNumber: initial?.partNumber || generatePartNumber(form.brand, form.category),
-      name: form.name.trim(),
-      category: form.category,
-      brand: form.brand.trim() || undefined,
-      cost: Number(form.costPerKg),
-      price: Number(form.costPerKg), // sensible default; unused for materials
-      reorderLevel: initial?.reorderLevel ?? 5,
-      bin: form.bin.trim() || undefined,
-      barcode: form.barcode.trim() || undefined,
-      supplier: form.supplier.trim() || undefined,
-      unitWeightGrams: 1000, // standardized: cost is per kg = per 1000g
-      archived: initial?.archived || false,
-    })
+    onSave(
+      {
+        partNumber: initial?.partNumber || generatePartNumber(form.brand, form.category),
+        name: form.name.trim(),
+        category: form.category,
+        brand: form.brand.trim() || undefined,
+        cost: Number(form.costPerKg),
+        price: Number(form.costPerKg), // sensible default; unused for materials
+        reorderLevel: initial?.reorderLevel ?? 5,
+        bin: form.bin.trim() || undefined,
+        barcode: form.barcode.trim() || undefined,
+        supplier: form.supplier.trim() || undefined,
+        unitWeightGrams: 1000, // standardized: cost is per kg = per 1000g
+        archived: initial?.archived || false,
+      },
+      // Only pass initial qty when creating a new product. Editing doesn't change stock.
+      initial ? undefined : Number(form.initialQty) || 0,
+    )
   }
 
   return (
@@ -166,6 +172,25 @@ export default function InventoryProductFormModal({
               />
             </div>
           </div>
+
+          {/* Initial quantity (only when adding, not editing). Editing stock is via stock movements. */}
+          {!initial && (
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Quantity in Stock</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={form.initialQty}
+                onChange={(e) => setForm({ ...form, initialQty: parseInt(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+                placeholder="1"
+              />
+              <p className="text-[10px] text-text-muted font-mono mt-1">
+                Number of spools/units to add as starting stock. Logged as IN movement.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <button type="button" onClick={onClose} className="btn-outline text-sm py-2 px-4">Cancel</button>
