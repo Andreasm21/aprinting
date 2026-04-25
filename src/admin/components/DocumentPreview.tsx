@@ -137,31 +137,37 @@ export default function DocumentPreview({ doc, onClose }: Props) {
             {doc.customerVatNumber && <p className="text-xs text-gray-500">VAT: {doc.customerVatNumber}</p>}
           </div>
 
-          {/* Line Items Table */}
-          <table className="w-full text-sm mb-6" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr className="border-b-2" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
-                <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Description</th>
-                {doc.lineItems.some(i => i.material) && <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Material</th>}
-                {doc.lineItems.some(i => i.weightGrams) && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Weight</th>}
-                <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Unit Price</th>
-                <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Qty</th>
-                <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doc.lineItems.map((item, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-2">{item.description}</td>
-                  {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material || '—'}</td>}
-                  {doc.lineItems.some(li => li.weightGrams) && <td className="py-2 text-right text-gray-600">{item.weightGrams ? `${item.weightGrams}g` : '—'}</td>}
-                  <td className="py-2 text-right">{item.unitPrice.toFixed(2)}</td>
-                  <td className="py-2 text-right">{item.quantity}</td>
-                  <td className="py-2 text-right font-medium">{item.total.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Line Items Table — when an override is set, per-line prices are
+              hidden so the customer only sees the negotiated final total. */}
+          {(() => {
+            const hidePrices = doc.totalOverride != null
+            return (
+              <table className="w-full text-sm mb-6" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr className="border-b-2" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
+                    <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Description</th>
+                    {doc.lineItems.some(i => i.material) && <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Material</th>}
+                    {doc.lineItems.some(i => i.weightGrams) && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Weight</th>}
+                    {!hidePrices && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Unit Price</th>}
+                    <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Qty</th>
+                    {!hidePrices && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Total</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {doc.lineItems.map((item, i) => (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-2">{item.description}</td>
+                      {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material || '—'}</td>}
+                      {doc.lineItems.some(li => li.weightGrams) && <td className="py-2 text-right text-gray-600">{item.weightGrams ? `${item.weightGrams}g` : '—'}</td>}
+                      {!hidePrices && <td className="py-2 text-right">{item.unitPrice.toFixed(2)}</td>}
+                      <td className="py-2 text-right">{item.quantity}</td>
+                      {!hidePrices && <td className="py-2 text-right font-medium">{item.total.toFixed(2)}</td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          })()}
 
           {/* Totals — when admin has overridden the final price, the customer
               sees ONLY the total. The override mechanism, breakdown lines and

@@ -4,9 +4,23 @@ import { useAuditLogStore } from './auditLogStore'
 
 export type MovementType = 'IN' | 'OUT' | 'ADJUST'
 export type StockStatus = 'OK' | 'LOW' | 'OUT'
-export type InventoryCategory = 'PLA' | 'PETG' | 'ABS' | 'TPU' | 'Resin' | 'Nylon' | 'Hardware' | 'Finished'
+export type InventoryCategory =
+  // Filaments — appear in the quotation material picker
+  | 'PLA' | 'PETG' | 'ABS' | 'TPU' | 'Resin' | 'Nylon'
+  // Print-shop stock that isn't filament
+  | 'Tools'         // calipers, scrapers, deburring tools, build-plate cleaners
+  | 'Spare Parts'   // nozzles, hot ends, build plates, belts, fans
+  | 'Consumables'   // IPA, glue sticks, paper towels, gloves, lubricants
+  | 'Equipment'     // printers, dryboxes, enclosures, washers/curers
+  | 'Packaging'     // boxes, tape, bubble wrap, mailers
+  | 'Hardware'      // screws, M3/M4 bolts, threaded inserts, magnets
+  | 'Finished'      // completed prints ready to ship
 
-export const CATEGORIES: InventoryCategory[] = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon', 'Hardware', 'Finished']
+export const CATEGORIES: InventoryCategory[] = [
+  'PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon',
+  'Tools', 'Spare Parts', 'Consumables', 'Equipment', 'Packaging',
+  'Hardware', 'Finished',
+]
 
 export interface InventoryProduct {
   id: string
