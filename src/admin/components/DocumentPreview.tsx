@@ -8,6 +8,18 @@ interface Props {
   onClose: () => void
 }
 
+// Strip brand / part-number / extra labels from a stored material string and
+// return only the filament kind (PLA / PETG / ABS / TPU / Resin / Nylon).
+// Used in the customer-facing render so the brand never shows.
+const FILAMENT_KINDS = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
+function filamentKindOnly(material: string): string {
+  const upper = material.toUpperCase()
+  for (const k of FILAMENT_KINDS) {
+    if (upper.includes(k.toUpperCase())) return k
+  }
+  return material
+}
+
 export default function DocumentPreview({ doc, onClose }: Props) {
   const contact = useContentStore((s) => s.content.contact)
   const isQuote = doc.type === 'quotation'
@@ -157,7 +169,7 @@ export default function DocumentPreview({ doc, onClose }: Props) {
                   {doc.lineItems.map((item, i) => (
                     <tr key={i} className="border-b border-gray-100">
                       <td className="py-2">{item.description}</td>
-                      {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material || '—'}</td>}
+                      {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material ? filamentKindOnly(item.material) : '—'}</td>}
                       {doc.lineItems.some(li => li.weightGrams) && <td className="py-2 text-right text-gray-600">{item.weightGrams ? `${item.weightGrams}g` : '—'}</td>}
                       {!hidePrices && <td className="py-2 text-right">{item.unitPrice.toFixed(2)}</td>}
                       <td className="py-2 text-right">{item.quantity}</td>
