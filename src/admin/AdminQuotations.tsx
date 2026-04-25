@@ -14,8 +14,11 @@ const STATUS_COLORS: Record<DocumentStatus, string> = {
   cancelled: 'text-red-400 border-red-400/30 bg-red-400/5',
 }
 
+// VAT inclusion status is shown in the totals area now, so the terms text
+// just states the currency. This avoids contradicting the totals when an
+// admin disables VAT for a specific customer.
 const DEFAULT_TERMS = `• This quotation is valid for 30 days from the date of issue.
-• Prices are in EUR and include Cyprus VAT at 19%.
+• Prices are in EUR.
 • Estimated weight is approximate; final pricing may vary ±15% based on actual print weight.
 • Payment is due upon completion unless otherwise agreed.
 • Standard delivery within Cyprus is included for orders over €50.

@@ -97,7 +97,7 @@ export default function QuoteCustomerPickerModal({ onClose }: { onClose: () => v
       total,
       paymentTerms: customer.paymentTerms || 'immediate',
       notes: 'Generated from Quote Cart',
-      termsAndConditions: '• This quotation is valid for 30 days from the date of issue.\n• Prices are in EUR and include Cyprus VAT at 19%.\n• Payment is due upon completion unless otherwise agreed.\n• Standard delivery within Cyprus is included for orders over €50.',
+      termsAndConditions: '• This quotation is valid for 30 days from the date of issue.\n• Prices are in EUR.\n• Payment is due upon completion unless otherwise agreed.\n• Standard delivery within Cyprus is included for orders over €50.',
       status: 'draft',
     })
 

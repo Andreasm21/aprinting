@@ -204,6 +204,12 @@ export default function DocumentPreview({ doc, onClose }: Props) {
                 <span>Total (EUR)</span>
                 <span>{(doc.totalOverride ?? doc.total).toFixed(2)}</span>
               </div>
+              {/* VAT status notice — always tell the customer whether VAT is included or not. */}
+              <p className="text-[10px] text-gray-500 text-right pt-0.5">
+                {doc.vatRate > 0
+                  ? `Inclusive of Cyprus VAT ${(doc.vatRate * 100).toFixed(0)}%`
+                  : 'VAT not included'}
+              </p>
             </div>
           </div>
 
