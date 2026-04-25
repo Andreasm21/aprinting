@@ -163,38 +163,46 @@ export default function DocumentPreview({ doc, onClose }: Props) {
             </tbody>
           </table>
 
-          {/* Totals */}
+          {/* Totals — when admin has overridden the final price, the customer
+              sees ONLY the total. The override mechanism, breakdown lines and
+              calculated values are hidden from the rendered document. */}
           <div className="flex justify-end mb-6">
             <div className="w-64 space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
-                <span>{doc.subtotal.toFixed(2)}</span>
-              </div>
-              {doc.discountPercent > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount ({doc.discountPercent}%)</span>
-                  <span>-{doc.discountAmount.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-500">VAT ({(doc.vatRate * 100).toFixed(0)}%)</span>
-                <span>{doc.vatAmount.toFixed(2)}</span>
-              </div>
-              {doc.deliveryFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Delivery</span>
-                  <span>{doc.deliveryFee.toFixed(2)}</span>
-                </div>
-              )}
-              {doc.extraCharge && doc.extraCharge > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{doc.extraChargeNote || 'Extra'}</span>
-                  <span>{doc.extraCharge.toFixed(2)}</span>
-                </div>
+              {doc.totalOverride == null && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Subtotal</span>
+                    <span>{doc.subtotal.toFixed(2)}</span>
+                  </div>
+                  {doc.discountPercent > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount ({doc.discountPercent}%)</span>
+                      <span>-{doc.discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {doc.vatRate > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">VAT ({(doc.vatRate * 100).toFixed(0)}%)</span>
+                      <span>{doc.vatAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {doc.deliveryFee > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Delivery</span>
+                      <span>{doc.deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {doc.extraCharge && doc.extraCharge > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">{doc.extraChargeNote || 'Extra'}</span>
+                      <span>{doc.extraCharge.toFixed(2)}</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="flex justify-between pt-2 border-t-2 font-bold text-base" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
                 <span>Total (EUR)</span>
-                <span>{doc.total.toFixed(2)}</span>
+                <span>{(doc.totalOverride ?? doc.total).toFixed(2)}</span>
               </div>
             </div>
           </div>

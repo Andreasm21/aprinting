@@ -328,10 +328,18 @@ function QuotationEditor({
     status: initial?.status || 'draft' as DocumentStatus,
     // VAT toggle — defaults to ON. If the existing document has vatRate=0 we treat it as OFF.
     vatEnabled: initial ? (initial.vatRate ?? CYPRUS_VAT_RATE) > 0 : true,
+    // Optional final-price override. When set, the customer-facing render shows
+    // just this value as the total (no breakdown). Use to negotiate up from the
+    // formula-calculated price.
+    overrideEnabled: initial?.totalOverride != null,
+    totalOverride: initial?.totalOverride ?? 0,
   })
 
   const effectiveVatRate = form.vatEnabled ? CYPRUS_VAT_RATE : 0
-  const totals = calcTotals(form.lineItems, form.deliveryFee, effectiveVatRate, form.discountPercent, form.extraCharge)
+  const calculatedTotals = calcTotals(form.lineItems, form.deliveryFee, effectiveVatRate, form.discountPercent, form.extraCharge)
+  // Final total: the override wins if enabled, otherwise the calculated total.
+  const finalTotal = form.overrideEnabled ? form.totalOverride : calculatedTotals.total
+  const totals = { ...calculatedTotals, total: finalTotal }
 
   const handleCustomerSelect = (customer: Customer | null) => {
     if (!customer) {
@@ -372,6 +380,7 @@ function QuotationEditor({
       subtotal: totals.subtotal,
       vatRate: effectiveVatRate,
       vatAmount: totals.vatAmount,
+      totalOverride: form.overrideEnabled ? Number(form.totalOverride) : undefined,
       deliveryFee: form.deliveryFee,
       discountPercent: form.discountPercent,
       discountAmount: totals.discountAmount,
@@ -508,8 +517,44 @@ function QuotationEditor({
                 <span>€{form.extraCharge.toFixed(2)}</span>
               </div>
             )}
+
+            {/* Final price override — admin-only. Customer-facing render hides this mechanism. */}
+            <div className="pt-2 border-t border-border space-y-2">
+              <label className="flex items-center justify-between gap-2 cursor-pointer select-none text-text-secondary">
+                <span className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.overrideEnabled}
+                    onChange={(e) => setForm({ ...form, overrideEnabled: e.target.checked, totalOverride: e.target.checked && !form.totalOverride ? calculatedTotals.total : form.totalOverride })}
+                    className="accent-accent-amber"
+                  />
+                  <span>Override final price</span>
+                </span>
+                {form.overrideEnabled && (
+                  <span className="text-[10px] text-text-muted line-through">€{calculatedTotals.total.toFixed(2)} calc.</span>
+                )}
+              </label>
+              {form.overrideEnabled && (
+                <div className="flex items-center gap-2">
+                  <span className="text-text-muted text-xs">€</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.totalOverride}
+                    onChange={(e) => setForm({ ...form, totalOverride: parseFloat(e.target.value) || 0 })}
+                    className="input-field text-sm font-mono flex-1"
+                    placeholder="Negotiated final price"
+                  />
+                </div>
+              )}
+              <p className="text-[10px] text-text-muted leading-snug">
+                Only the final TOTAL is shown on the customer-facing quotation. The override mechanism is hidden from the rendered PDF.
+              </p>
+            </div>
+
             <div className="flex justify-between pt-2 border-t border-border text-text-primary font-bold text-base">
-              <span>Total</span>
+              <span>Total {form.overrideEnabled && <span className="text-[10px] text-accent-amber font-normal">(overridden)</span>}</span>
               <span className="text-accent-blue">€{totals.total.toFixed(2)}</span>
             </div>
           </div>

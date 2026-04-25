@@ -26,6 +26,9 @@ export interface InvoiceLineItem {
 }
 
 export interface Invoice {
+  // Optional admin override of the final total. When set, the customer-facing
+  // render shows just this number — no subtotal/VAT/discount breakdown.
+  totalOverride?: number
   id: string
   type: DocumentType
   documentNumber: string
