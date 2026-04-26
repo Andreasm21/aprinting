@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Send, MessageCircle, Mail, MapPin, Clock, Upload, Camera, ThumbsUp } from 'lucide-react'
+import { Send, MessageCircle, Mail, MapPin, Upload, Camera, ThumbsUp } from 'lucide-react'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { useContentStore } from '@/stores/contentStore'
@@ -103,23 +103,25 @@ export default function Contact() {
 
           {/* Right — quick contact */}
           <div className="reveal flex flex-col gap-5" style={{ transitionDelay: '150ms' }}>
-            {/* WhatsApp */}
-            <a
-              href={`https://wa.me/${cc.whatsappNumber.replace(/[^0-9+]/g, '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-accent-green/10 border border-accent-green/30 rounded-lg p-4 hover:bg-accent-green/20 transition-colors group"
-            >
-              <div className="w-12 h-12 bg-accent-green rounded-full flex items-center justify-center shrink-0">
-                <MessageCircle size={24} className="text-white" />
-              </div>
-              <div>
-                <p className="font-mono text-base font-bold text-text-primary group-hover:text-accent-green transition-colors">
-                  {t.contact.whatsapp}
-                </p>
-                <p className="text-text-secondary text-sm">{cc.whatsappNumber}</p>
-              </div>
-            </a>
+            {/* WhatsApp — temporarily hidden until we have a dedicated number */}
+            {false && (
+              <a
+                href={`https://wa.me/${cc.whatsappNumber.replace(/[^0-9+]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-accent-green/10 border border-accent-green/30 rounded-lg p-4 hover:bg-accent-green/20 transition-colors group"
+              >
+                <div className="w-12 h-12 bg-accent-green rounded-full flex items-center justify-center shrink-0">
+                  <MessageCircle size={24} className="text-white" />
+                </div>
+                <div>
+                  <p className="font-mono text-base font-bold text-text-primary group-hover:text-accent-green transition-colors">
+                    {t.contact.whatsapp}
+                  </p>
+                  <p className="text-text-secondary text-sm">{cc.whatsappNumber}</p>
+                </div>
+              </a>
+            )}
 
             {/* Contact details */}
             <div className="card-base space-y-5">
@@ -139,13 +141,7 @@ export default function Contact() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-accent-amber shrink-0" />
-                <div>
-                  <p className="text-text-muted text-xs font-mono uppercase">{t.contact.hours}</p>
-                  <p className="text-text-primary text-sm">{cc.hours}</p>
-                </div>
-              </div>
+              {/* Business Hours — temporarily hidden until we set fixed hours */}
             </div>
 
             {/* Social */}
