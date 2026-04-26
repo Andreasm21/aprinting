@@ -161,87 +161,102 @@ export default function DocumentPreview({ doc, onClose }: Props) {
             {doc.customerVatNumber && <p className="text-xs text-gray-500">VAT: {doc.customerVatNumber}</p>}
           </div>
 
-          {/* Line Items Table — when an override is set, per-line prices are
-              hidden so the customer only sees the negotiated final total. */}
+          {/* When admin has overridden the final total, scale every line item
+              proportionally so the math reconciles. Solve for the subtotal that
+              would yield the override after discount + VAT + delivery + extra,
+              then ratio-scale each line's unit price + total against the
+              original subtotal. Customer sees normal-looking line items that
+              correctly add up to the negotiated final number. */}
           {(() => {
-            const hidePrices = doc.totalOverride != null
+            let lineScale = 1
+            let displaySubtotal = doc.subtotal
+            let displayDiscount = doc.discountAmount
+            let displayVat = doc.vatAmount
+
+            if (doc.totalOverride != null && doc.subtotal > 0) {
+              const denom = (1 - (doc.discountPercent || 0) / 100) * (1 + (doc.vatRate || 0))
+              const targetSubtotal = denom > 0
+                ? (doc.totalOverride - (doc.deliveryFee || 0) - (doc.extraCharge || 0)) / denom
+                : doc.totalOverride
+              lineScale = targetSubtotal / doc.subtotal
+              displaySubtotal = targetSubtotal
+              displayDiscount = targetSubtotal * (doc.discountPercent || 0) / 100
+              displayVat = (targetSubtotal - displayDiscount) * (doc.vatRate || 0)
+            }
+
             return (
-              <table className="w-full text-sm mb-6" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr className="border-b-2" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
-                    <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Description</th>
-                    {doc.lineItems.some(i => i.material) && <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Material</th>}
-                    {doc.lineItems.some(i => i.weightGrams) && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Weight</th>}
-                    {!hidePrices && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Unit Price</th>}
-                    <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Qty</th>
-                    {!hidePrices && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Total</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {doc.lineItems.map((item, i) => (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="py-2">{item.description}</td>
-                      {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material ? filamentKindOnly(item.material) : '—'}</td>}
-                      {doc.lineItems.some(li => li.weightGrams) && <td className="py-2 text-right text-gray-600">{item.weightGrams ? `${item.weightGrams}g` : '—'}</td>}
-                      {!hidePrices && <td className="py-2 text-right">{item.unitPrice.toFixed(2)}</td>}
-                      <td className="py-2 text-right">{item.quantity}</td>
-                      {!hidePrices && <td className="py-2 text-right font-medium">{item.total.toFixed(2)}</td>}
+              <>
+                <table className="w-full text-sm mb-6" style={{ borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr className="border-b-2" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
+                      <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Description</th>
+                      {doc.lineItems.some(i => i.material) && <th className="text-left py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Material</th>}
+                      {doc.lineItems.some(i => i.weightGrams) && <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Weight</th>}
+                      <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Unit Price</th>
+                      <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Qty</th>
+                      <th className="text-right py-2 text-xs uppercase tracking-wider text-gray-500 font-bold">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {doc.lineItems.map((item, i) => (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-2">{item.description}</td>
+                        {doc.lineItems.some(li => li.material) && <td className="py-2 text-gray-600 text-xs">{item.material ? filamentKindOnly(item.material) : '—'}</td>}
+                        {doc.lineItems.some(li => li.weightGrams) && <td className="py-2 text-right text-gray-600">{item.weightGrams ? `${item.weightGrams}g` : '—'}</td>}
+                        <td className="py-2 text-right">{(item.unitPrice * lineScale).toFixed(2)}</td>
+                        <td className="py-2 text-right">{item.quantity}</td>
+                        <td className="py-2 text-right font-medium">{(item.total * lineScale).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Totals — full breakdown shown in both modes; when overridden,
+                    every number is recalculated from the scaled subtotal. */}
+                <div className="flex justify-end mb-6">
+                  <div className="w-64 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Subtotal</span>
+                      <span>{displaySubtotal.toFixed(2)}</span>
+                    </div>
+                    {doc.discountPercent > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount ({doc.discountPercent}%)</span>
+                        <span>-{displayDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {doc.vatRate > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">VAT ({(doc.vatRate * 100).toFixed(0)}%)</span>
+                        <span>{displayVat.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {doc.deliveryFee > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Delivery</span>
+                        <span>{doc.deliveryFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {doc.extraCharge && doc.extraCharge > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">{doc.extraChargeNote || 'Extra'}</span>
+                        <span>{doc.extraCharge.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t-2 font-bold text-base" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
+                      <span>Total (EUR)</span>
+                      <span>{(doc.totalOverride ?? doc.total).toFixed(2)}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 text-right pt-0.5">
+                      {doc.vatRate > 0
+                        ? `Inclusive of Cyprus VAT ${(doc.vatRate * 100).toFixed(0)}%`
+                        : 'VAT not included'}
+                    </p>
+                  </div>
+                </div>
+              </>
             )
           })()}
-
-          {/* Totals — when admin has overridden the final price, the customer
-              sees ONLY the total. The override mechanism, breakdown lines and
-              calculated values are hidden from the rendered document. */}
-          <div className="flex justify-end mb-6">
-            <div className="w-64 space-y-1.5 text-sm">
-              {doc.totalOverride == null && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span>{doc.subtotal.toFixed(2)}</span>
-                  </div>
-                  {doc.discountPercent > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount ({doc.discountPercent}%)</span>
-                      <span>-{doc.discountAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {doc.vatRate > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">VAT ({(doc.vatRate * 100).toFixed(0)}%)</span>
-                      <span>{doc.vatAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {doc.deliveryFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Delivery</span>
-                      <span>{doc.deliveryFee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {doc.extraCharge && doc.extraCharge > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{doc.extraChargeNote || 'Extra'}</span>
-                      <span>{doc.extraCharge.toFixed(2)}</span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="flex justify-between pt-2 border-t-2 font-bold text-base" style={{ borderColor: isQuote ? '#3B82F6' : '#F59E0B' }}>
-                <span>Total (EUR)</span>
-                <span>{(doc.totalOverride ?? doc.total).toFixed(2)}</span>
-              </div>
-              {/* VAT status notice — always tell the customer whether VAT is included or not. */}
-              <p className="text-[10px] text-gray-500 text-right pt-0.5">
-                {doc.vatRate > 0
-                  ? `Inclusive of Cyprus VAT ${(doc.vatRate * 100).toFixed(0)}%`
-                  : 'VAT not included'}
-              </p>
-            </div>
-          </div>
 
           {/* Payment Terms */}
           {doc.paymentTerms && doc.paymentTerms !== 'immediate' && (

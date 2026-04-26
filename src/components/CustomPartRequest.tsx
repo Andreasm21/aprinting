@@ -643,15 +643,9 @@ export default function CustomPartRequest() {
                     <label className="block font-mono text-xs text-text-muted uppercase mb-1">Contact Name</label>
                     <input value={b2b.contactName} onChange={(e) => setB2B({ ...b2b, contactName: e.target.value })} className="input-field" />
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email</label>
-                      <input type="email" value={b2b.contactEmail} onChange={(e) => setB2B({ ...b2b, contactEmail: e.target.value })} className="input-field" />
-                    </div>
-                    <div>
-                      <label className="block font-mono text-xs text-text-muted uppercase mb-1">Phone</label>
-                      <input type="tel" value={b2b.contactPhone} onChange={(e) => setB2B({ ...b2b, contactPhone: e.target.value })} className="input-field" />
-                    </div>
+                  <div>
+                    <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email</label>
+                    <input type="email" value={b2b.contactEmail} onChange={(e) => setB2B({ ...b2b, contactEmail: e.target.value })} className="input-field" />
                   </div>
                   <div>
                     <label className="block font-mono text-xs text-text-muted uppercase mb-1">Additional Notes</label>
@@ -749,9 +743,6 @@ export default function CustomPartRequest() {
                   <span className="text-text-primary font-accent">{b2b.contactName}</span>
                   <span className="text-text-muted">Email:</span>
                   <span className="text-text-primary font-accent">{b2b.contactEmail}</span>
-                  {b2b.contactPhone && (
-                    <><span className="text-text-muted">Phone:</span><span className="text-text-primary font-accent">{b2b.contactPhone}</span></>
-                  )}
                 </div>
               </div>
 
