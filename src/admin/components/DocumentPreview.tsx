@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, Printer, Download } from 'lucide-react'
+import { X, Printer, Download, Mail } from 'lucide-react'
 import type { Invoice } from '@/stores/invoicesStore'
 import { useContentStore } from '@/stores/contentStore'
+import SendEmailModal from './SendEmailModal'
 
 interface Props {
   doc: Invoice
@@ -24,6 +25,7 @@ export default function DocumentPreview({ doc, onClose }: Props) {
   const contact = useContentStore((s) => s.content.contact)
   const isQuote = doc.type === 'quotation'
   const [downloading, setDownloading] = useState(false)
+  const [showEmail, setShowEmail] = useState(false)
 
   const handlePrint = () => {
     window.print()
@@ -98,6 +100,12 @@ export default function DocumentPreview({ doc, onClose }: Props) {
           <h2 className="font-mono text-sm font-bold text-gray-800">Preview — {doc.documentNumber}</h2>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowEmail(true)}
+              className="flex items-center gap-1.5 text-xs font-mono bg-blue-500 text-white px-3 py-1.5 rounded hover:bg-blue-600"
+            >
+              <Mail size={13} /> Send by Email
+            </button>
+            <button
               onClick={handleDownloadPDF}
               disabled={downloading}
               className="flex items-center gap-1.5 text-xs font-mono bg-amber-500 text-white px-3 py-1.5 rounded hover:bg-amber-600 disabled:opacity-50"
@@ -112,6 +120,10 @@ export default function DocumentPreview({ doc, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        {showEmail && (
+          <SendEmailModal doc={doc} pdfElementId="printable-document" onClose={() => setShowEmail(false)} />
+        )}
 
         {/* Printable document */}
         <div id="printable-document" className="p-8 text-gray-900" style={{ fontFamily: "'Inter', sans-serif" }}>
