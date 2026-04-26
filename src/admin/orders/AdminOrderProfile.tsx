@@ -2,11 +2,15 @@ import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ClipboardList, FileText, Receipt, User, Calendar,
-  CheckCircle2, Circle, MessageSquare, Link as LinkIcon, Copy, Check,
+  CheckCircle2, Circle, MessageSquare, Link as LinkIcon, Copy, Check, Mail, Loader2,
 } from 'lucide-react'
 import { useOrdersStore, ORDER_STATUS_FLOW, ORDER_STATUS_LABEL, type OrderStatus, type OrderEvent } from '@/stores/ordersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
+import { useCustomersStore } from '@/stores/customersStore'
+import { useEmailLogStore } from '@/stores/emailLogStore'
+import { sendEmail } from '@/lib/emailClient'
+import { orderTrackingEmail } from '@/lib/emailTemplates'
 import DocumentPreview from '../components/DocumentPreview'
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
@@ -60,6 +64,12 @@ export default function AdminOrderProfile() {
   const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [emailNote, setEmailNote] = useState('')
+  const customers = useCustomersStore((s) => s.customers)
+  const logEmail = useEmailLogStore((s) => s.log)
 
   if (!order) {
     return (
@@ -83,6 +93,72 @@ export default function AdminOrderProfile() {
     if (!noteDraft.trim()) return
     await appendEvent(order.id, { type: 'note_added', by: currentUser?.username, note: noteDraft.trim() })
     setNoteDraft('')
+  }
+
+  // Resolve customer email — check by id, then by linked invoice's customerEmail
+  // (orders sometimes don't carry customerId for legacy reasons).
+  const resolvedEmail = (() => {
+    if (order.customerId) {
+      const c = customers.find((c) => c.id === order.customerId)
+      if (c) return c.email
+    }
+    if (invoice?.customerEmail) return invoice.customerEmail
+    if (quote?.customerEmail) return quote.customerEmail
+    return ''
+  })()
+
+  const handleSendTracking = async () => {
+    if (!resolvedEmail) {
+      setSendResult({ ok: false, msg: 'No customer email on file for this order.' })
+      return
+    }
+    setSending(true)
+    setSendResult(null)
+    const trackingUrl = `${window.location.origin}/track/${order.id}`
+    const tmpl = orderTrackingEmail({
+      customerName: order.customerName,
+      orderNumber: order.orderNumber,
+      statusLabel: ORDER_STATUS_LABEL[order.status],
+      total: order.total,
+      vatRate: invoice?.vatRate ?? 0,
+      trackingUrl,
+      noteFromAdmin: emailNote.trim() || undefined,
+    })
+    const res = await sendEmail({
+      to: resolvedEmail,
+      subject: tmpl.subject,
+      html: tmpl.html,
+      text: tmpl.text,
+    })
+    await logEmail({
+      to: [resolvedEmail],
+      subject: tmpl.subject,
+      template: 'custom',
+      documentId: order.invoiceId,
+      customerId: order.customerId,
+      status: res.success ? 'sent' : 'failed',
+      error: res.error,
+      sentBy: currentUser?.username,
+    })
+    if (res.success) {
+      // Log to the order timeline so future-you knows what was emailed.
+      await appendEvent(order.id, {
+        type: 'note_added',
+        by: currentUser?.username || 'admin',
+        note: `Tracking link emailed to ${resolvedEmail}${emailNote.trim() ? ` with note: "${emailNote.trim()}"` : ''}`,
+      })
+    }
+    setSendResult({
+      ok: res.success,
+      msg: res.success
+        ? `Tracking link sent to ${resolvedEmail}`
+        : `Failed: ${res.error || 'unknown'}`,
+    })
+    setSending(false)
+    if (res.success) {
+      setEmailNote('')
+      setTimeout(() => { setShowSendModal(false); setSendResult(null) }, 1500)
+    }
   }
 
   return (
@@ -122,7 +198,15 @@ export default function AdminOrderProfile() {
             <LinkIcon size={14} className="text-accent-blue shrink-0" />
             <code className="font-mono text-xs text-text-secondary truncate">{`${window.location.origin}/track/${order.id}`}</code>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <button
+              onClick={() => setShowSendModal(true)}
+              disabled={!resolvedEmail}
+              className="text-xs font-mono text-accent-amber hover:text-accent-amber/80 px-3 py-1.5 rounded-lg border border-accent-amber/40 hover:bg-accent-amber/10 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              title={resolvedEmail ? `Email this link to ${resolvedEmail}` : 'No customer email on file'}
+            >
+              <Mail size={12} /> Send by email
+            </button>
             <button
               onClick={() => {
                 const url = `${window.location.origin}/track/${order.id}`
@@ -247,6 +331,55 @@ export default function AdminOrderProfile() {
 
       {previewDoc && (
         <DocumentPreview doc={previewDoc} onClose={() => setPreviewDocId(null)} />
+      )}
+
+      {showSendModal && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-bg-secondary border border-border rounded-lg max-w-md w-full p-6 space-y-4">
+            <div>
+              <h3 className="font-mono text-base font-bold text-text-primary flex items-center gap-2">
+                <Mail size={16} className="text-accent-amber" /> Send tracking link
+              </h3>
+              <p className="text-text-secondary text-xs mt-1.5">
+                Will be emailed to <span className="text-accent-amber font-mono">{resolvedEmail}</span> with the current status and a link to <code className="text-text-muted">/track/{order.id.slice(0, 14)}…</code>
+              </p>
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1.5">Optional note to include</label>
+              <textarea
+                value={emailNote}
+                onChange={(e) => setEmailNote(e.target.value)}
+                placeholder="e.g. 'Production starts tomorrow morning' or 'Picked up by courier — should arrive by Wed'"
+                rows={3}
+                className="input-field text-sm w-full"
+              />
+            </div>
+            {sendResult && (
+              <div className={`text-xs font-mono p-2 rounded ${sendResult.ok ? 'bg-accent-green/10 text-accent-green border border-accent-green/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+                {sendResult.ok ? '✓ ' : '✗ '}{sendResult.msg}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowSendModal(false); setSendResult(null); setEmailNote('') }}
+                disabled={sending}
+                className="btn-outline text-sm py-2 px-4 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendTracking}
+                disabled={sending || !resolvedEmail}
+                className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {sending ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

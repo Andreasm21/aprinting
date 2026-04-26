@@ -204,6 +204,54 @@ export function portalCredentialsEmail(opts: {
   }
 }
 
+/** Order tracking-link email — sent from the admin's Order Profile so the
+ *  customer gets the public /track/:id URL with the current status. */
+export function orderTrackingEmail(opts: {
+  customerName: string
+  orderNumber: string
+  statusLabel: string
+  total: number
+  vatRate: number
+  trackingUrl: string
+  noteFromAdmin?: string
+}): { subject: string; html: string; text: string } {
+  const totalStr = opts.total.toFixed(2)
+  const body = `
+    <p style="margin:0 0 16px 0;">Hello${opts.customerName ? ' ' + escape(opts.customerName.split(' ')[0]) : ''},</p>
+    <p style="margin:0 0 16px 0;">Here's the live tracking link for your order — click any time to see where it stands and download your invoice.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.bgRow}; border:1px solid ${COLORS.border}; border-radius:6px; margin:16px 0;">
+      <tr><td style="padding:16px;">
+        <div style="font-family:${fontStack}; font-size:11px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;">Order</div>
+        <div style="font-family:${fontStack}; font-size:18px; color:${COLORS.text}; font-weight:bold;">${escape(opts.orderNumber)}</div>
+        <div style="margin-top:12px; font-size:13px; color:${COLORS.textMuted};">Status: <span style="color:${COLORS.amber}; font-family:${fontStack}; font-weight:bold;">${escape(opts.statusLabel)}</span></div>
+        <div style="margin-top:6px; font-size:13px; color:${COLORS.textMuted};">Total: <span style="color:${COLORS.amber}; font-family:${fontStack}; font-weight:bold;">€${totalStr}</span></div>
+        ${opts.vatRate > 0
+          ? `<div style="font-size:11px; color:${COLORS.textMuted}; margin-top:4px;">Inclusive of Cyprus VAT ${(opts.vatRate * 100).toFixed(0)}%</div>`
+          : `<div style="font-size:11px; color:${COLORS.textMuted}; margin-top:4px;">VAT not included</div>`}
+      </td></tr>
+    </table>
+    ${opts.noteFromAdmin
+      ? `<div style="margin:16px 0; padding:12px; background:${COLORS.bgRow}; border-left:3px solid ${COLORS.amber}; border-radius:4px;">
+           <div style="font-family:${fontStack}; font-size:10px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;">Note from Axiom</div>
+           <div style="font-size:13px; color:${COLORS.text}; white-space:pre-wrap;">${escape(opts.noteFromAdmin)}</div>
+         </div>`
+      : ''}
+    <p style="margin:16px 0 0 0;">If you have any questions, just reply to this email.</p>
+  `
+
+  return {
+    subject: `Your order ${opts.orderNumber} — ${opts.statusLabel}`,
+    html: shell({
+      preheader: `Track ${opts.orderNumber} — currently ${opts.statusLabel.toLowerCase()}`,
+      title: `Order ${opts.orderNumber}`,
+      body,
+      ctaLabel: 'Track Your Order',
+      ctaUrl: opts.trackingUrl,
+    }),
+    text: `Hello${opts.customerName ? ' ' + opts.customerName.split(' ')[0] : ''},\n\nOrder ${opts.orderNumber} status: ${opts.statusLabel}.\nTotal: €${totalStr}.\n\nTrack live: ${opts.trackingUrl}\n${opts.noteFromAdmin ? '\nNote from Axiom: ' + opts.noteFromAdmin + '\n' : ''}\nReply to this email with any questions.\n\nAxiom — team@axiomcreate.com`,
+  }
+}
+
 /** Free-form email composed by the admin. */
 export function customEmail(opts: { subject: string; bodyHtml: string }): { subject: string; html: string; text: string } {
   return {
