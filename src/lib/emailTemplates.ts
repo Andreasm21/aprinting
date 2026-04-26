@@ -85,7 +85,11 @@ ${opts.preheader ? `<div style="display:none; max-height:0; overflow:hidden; opa
 }
 
 /** Quotation email body. Customer-facing summary of the quote. */
-export function quotationEmail(doc: Invoice, customer?: Customer): { subject: string; html: string; text: string } {
+export function quotationEmail(
+  doc: Invoice,
+  customer?: Customer,
+  viewUrl?: string,
+): { subject: string; html: string; text: string } {
   const total = (doc.totalOverride ?? doc.total).toFixed(2)
   const validLine = doc.validUntil
     ? `Valid until <strong style="color:${COLORS.amber};">${new Date(doc.validUntil).toLocaleDateString('en-GB')}</strong>.`
@@ -93,7 +97,7 @@ export function quotationEmail(doc: Invoice, customer?: Customer): { subject: st
 
   const summary = `
     <p style="margin:0 0 16px 0;">Hello${customer?.name ? ' ' + escape(customer.name.split(' ')[0]) : ''},</p>
-    <p style="margin:0 0 16px 0;">Thank you for your interest in our 3D printing services. Please find your quotation attached as a PDF.</p>
+    <p style="margin:0 0 16px 0;">Thank you for your interest in our 3D printing services. Please find your quotation attached as a PDF — or click the button below to review and accept it online.</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.bgRow}; border:1px solid ${COLORS.border}; border-radius:6px; margin:16px 0;">
       <tr><td style="padding:16px;">
         <div style="font-family:${fontStack}; font-size:11px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;">Quotation</div>
@@ -114,8 +118,10 @@ export function quotationEmail(doc: Invoice, customer?: Customer): { subject: st
       preheader: `Your quotation ${doc.documentNumber} for €${total}`,
       title: `Quotation ${doc.documentNumber}`,
       body: summary,
+      ctaLabel: viewUrl ? 'Review & Accept Online' : undefined,
+      ctaUrl: viewUrl,
     }),
-    text: `Hello${customer?.name ? ' ' + customer.name.split(' ')[0] : ''},\n\nYour quotation ${doc.documentNumber} for €${total} is attached.${doc.validUntil ? ` Valid until ${new Date(doc.validUntil).toLocaleDateString('en-GB')}.` : ''}\n\nReply to this email if you'd like to proceed.\n\nAxiom — team@axiomcreate.com`,
+    text: `Hello${customer?.name ? ' ' + customer.name.split(' ')[0] : ''},\n\nYour quotation ${doc.documentNumber} for €${total} is attached.${doc.validUntil ? ` Valid until ${new Date(doc.validUntil).toLocaleDateString('en-GB')}.` : ''}${viewUrl ? `\n\nReview and accept online: ${viewUrl}` : ''}\n\nReply to this email if you'd like to proceed.\n\nAxiom — team@axiomcreate.com`,
   }
 }
 

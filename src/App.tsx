@@ -43,6 +43,7 @@ const InventoryOrders = lazy(() => import('@/admin/inventory/InventoryOrders'))
 const InventoryQueue = lazy(() => import('@/admin/inventory/InventoryQueue'))
 const AdminOrdersOverview = lazy(() => import('@/admin/orders/AdminOrdersOverview'))
 const AdminOrderProfile = lazy(() => import('@/admin/orders/AdminOrderProfile'))
+const PublicQuoteView = lazy(() => import('@/public/PublicQuoteView'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -99,6 +100,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<SitePage />} />
+        {/* Public quote viewer — no admin login, accessed by link from email */}
+        <Route path="/quote/:id" element={
+          <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading quote...</div></div>}>
+            <PublicQuoteView />
+          </Suspense>
+        } />
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />

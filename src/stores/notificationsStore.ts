@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
 
-export type NotificationType = 'order' | 'part_request' | 'contact'
+export type NotificationType = 'order' | 'part_request' | 'contact' | 'admin_alert'
 
 export interface OrderNotification {
   type: 'order'
@@ -64,7 +64,37 @@ export interface ContactNotification {
   read: boolean
 }
 
-export type Notification = OrderNotification | PartRequestNotification | ContactNotification
+/** Generic in-app alert raised by various flows — quote accepted by customer,
+ *  changes requested, customer requesting a portal account, paid-invoice
+ *  cleanup prompt, etc. The `kind` field discriminates between subtypes;
+ *  `context` holds whatever ids/names the UI needs to render action links. */
+export interface AdminAlertNotification {
+  type: 'admin_alert'
+  id: string
+  date: string
+  kind:
+    | 'quote_accepted'
+    | 'quote_changes_requested'
+    | 'account_requested'
+    | 'invoice_paid_cleanup'
+    | 'other'
+  title: string
+  message: string
+  context?: {
+    quoteId?: string
+    quoteNumber?: string
+    invoiceId?: string
+    invoiceNumber?: string
+    orderId?: string
+    orderNumber?: string
+    customerEmail?: string
+    customerName?: string
+    customerId?: string
+  }
+  read: boolean
+}
+
+export type Notification = OrderNotification | PartRequestNotification | ContactNotification | AdminAlertNotification
 
 interface NotificationsState {
   notifications: Notification[]
@@ -72,6 +102,7 @@ interface NotificationsState {
   addOrder: (order: Omit<OrderNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
   addPartRequest: (request: Omit<PartRequestNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
   addContact: (contact: Omit<ContactNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<void>
+  addAdminAlert: (alert: Omit<AdminAlertNotification, 'type' | 'id' | 'date' | 'read'>) => Promise<string>
   markRead: (id: string) => Promise<void>
   markAllRead: () => Promise<void>
   deleteNotification: (id: string) => Promise<void>
@@ -235,6 +266,20 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       set((state) => ({ notifications: [notification, ...state.notifications] }))
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New contact message`, `From ${notification.name}`)
+    },
+
+    addAdminAlert: async (alert) => {
+      const notification: AdminAlertNotification = {
+        ...alert,
+        type: 'admin_alert',
+        id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: new Date().toISOString(),
+        read: false,
+      }
+      set((state) => ({ notifications: [notification, ...state.notifications] }))
+      await sbUpsert(notification)
+      useAuditLogStore.getState().log('create', 'notification', notification.title, notification.message)
+      return notification.id
     },
 
     markRead: async (id) => {

@@ -39,10 +39,11 @@ function formatDate(dateStr: string): string {
 }
 
 function TypeBadge({ type }: { type: NotificationType }) {
-  const config = {
+  const config: Record<NotificationType, { label: string; icon: typeof ShoppingCart; color: string }> = {
     order: { label: 'Order', icon: ShoppingCart, color: 'text-accent-green bg-accent-green/10 border-accent-green/20' },
     part_request: { label: 'Part Request', icon: Car, color: 'text-accent-blue bg-accent-blue/10 border-accent-blue/20' },
     contact: { label: 'Message', icon: MessageSquare, color: 'text-accent-amber bg-accent-amber/10 border-accent-amber/20' },
+    admin_alert: { label: 'Alert', icon: Bell, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
   }
   const { label, icon: Icon, color } = config[type]
   return (
@@ -397,6 +398,7 @@ export default function AdminNotifications() {
     order: notifications.filter((n) => n.type === 'order').length,
     part_request: notifications.filter((n) => n.type === 'part_request').length,
     contact: notifications.filter((n) => n.type === 'contact').length,
+    admin_alert: notifications.filter((n) => n.type === 'admin_alert').length,
   }
 
   const handleClear = () => {
