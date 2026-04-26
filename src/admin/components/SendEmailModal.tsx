@@ -16,13 +16,19 @@ interface Props {
 
 export default function SendEmailModal({ doc, pdfElementId, onClose }: Props) {
   const customers = useCustomersStore((s) => s.customers)
+  // Look up by id first, fall back to email match (works for legacy docs
+  // created before the customerId link existed).
   const customer = customers.find((c) => c.id === doc.customerId)
+    || customers.find((c) => c.email.toLowerCase() === (doc.customerEmail || '').toLowerCase())
   const currentUser = useAdminAuthStore((s) => s.currentUser)
   const logEmail = useEmailLogStore((s) => s.log)
 
-  // Default template based on document type
+  // Default template based on document type. If the customer already has
+  // portal access, surface the sign-in link in the email body.
   const isQuote = doc.type === 'quotation'
-  const tmpl = isQuote ? quotationEmail(doc, customer) : invoiceEmail(doc, customer)
+  const viewUrl = isQuote ? `${window.location.origin}/quote/${doc.id}` : undefined
+  const portalUrl = customer?.portalEnabled ? `${window.location.origin}/portal` : undefined
+  const tmpl = isQuote ? quotationEmail(doc, customer, viewUrl, portalUrl) : invoiceEmail(doc, customer)
 
   const [to, setTo] = useState(doc.customerEmail || customer?.email || '')
   const [cc, setCc] = useState('')

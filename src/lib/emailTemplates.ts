@@ -84,15 +84,27 @@ ${opts.preheader ? `<div style="display:none; max-height:0; overflow:hidden; opa
 </html>`
 }
 
-/** Quotation email body. Customer-facing summary of the quote. */
+/** Quotation email body. Customer-facing summary of the quote.
+ *  If `portalUrl` is provided, the email mentions that the customer can
+ *  sign in to track this order — otherwise it just shows the public
+ *  accept link without pushing portal sign-up. */
 export function quotationEmail(
   doc: Invoice,
   customer?: Customer,
   viewUrl?: string,
+  portalUrl?: string,
 ): { subject: string; html: string; text: string } {
   const total = (doc.totalOverride ?? doc.total).toFixed(2)
   const validLine = doc.validUntil
     ? `Valid until <strong style="color:${COLORS.amber};">${new Date(doc.validUntil).toLocaleDateString('en-GB')}</strong>.`
+    : ''
+
+  // Existing portal account? Tell them where to sign in.
+  // No portal account? Don't push them to make one — that's a separate flow.
+  const portalLine = portalUrl
+    ? `<p style="margin:16px 0 0 0; padding:12px; background:${COLORS.bgRow}; border-left:3px solid ${COLORS.amber}; border-radius:4px;">
+         You already have a Customer Portal account — once accepted you can <a href="${escape(portalUrl)}" style="color:${COLORS.amber}; text-decoration:underline;">sign in to track this order</a> alongside your other quotes and invoices.
+       </p>`
     : ''
 
   const summary = `
@@ -109,6 +121,7 @@ export function quotationEmail(
       </td></tr>
     </table>
     <p style="margin:16px 0 0 0;">${validLine}</p>
+    ${portalLine}
     <p style="margin:16px 0 0 0;">If you'd like to proceed or have any questions, simply reply to this email.</p>
   `
 
@@ -121,7 +134,7 @@ export function quotationEmail(
       ctaLabel: viewUrl ? 'Review & Accept Online' : undefined,
       ctaUrl: viewUrl,
     }),
-    text: `Hello${customer?.name ? ' ' + customer.name.split(' ')[0] : ''},\n\nYour quotation ${doc.documentNumber} for €${total} is attached.${doc.validUntil ? ` Valid until ${new Date(doc.validUntil).toLocaleDateString('en-GB')}.` : ''}${viewUrl ? `\n\nReview and accept online: ${viewUrl}` : ''}\n\nReply to this email if you'd like to proceed.\n\nAxiom — team@axiomcreate.com`,
+    text: `Hello${customer?.name ? ' ' + customer.name.split(' ')[0] : ''},\n\nYour quotation ${doc.documentNumber} for €${total} is attached.${doc.validUntil ? ` Valid until ${new Date(doc.validUntil).toLocaleDateString('en-GB')}.` : ''}${viewUrl ? `\n\nReview and accept online: ${viewUrl}` : ''}${portalUrl ? `\n\nSign in to your Customer Portal to track this order: ${portalUrl}` : ''}\n\nReply to this email if you'd like to proceed.\n\nAxiom — team@axiomcreate.com`,
   }
 }
 

@@ -310,9 +310,14 @@ export default function AdminQuotations() {
               setTimeout(() => setSendBanner(null), 8000)
               return
             }
-            const customer = saved.customerId ? customers.find((c) => c.id === saved.customerId) : undefined
+            const customer = saved.customerId
+              ? customers.find((c) => c.id === saved.customerId)
+              : customers.find((c) => c.email.toLowerCase() === toEmail.toLowerCase())
             const viewUrl = `${window.location.origin}/quote/${savedId}`
-            const tmpl = quotationEmail(saved, customer, viewUrl)
+            // If customer has portal access enabled, the email points them at
+            // the portal sign-in instead of pushing a new account creation.
+            const portalUrl = customer?.portalEnabled ? `${window.location.origin}/portal` : undefined
+            const tmpl = quotationEmail(saved, customer, viewUrl, portalUrl)
             console.log('[save+send] sending to', toEmail, 'subject:', tmpl.subject, 'view url:', viewUrl)
             const res = await sendEmail({
               to: toEmail,

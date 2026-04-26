@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useInvoicesStore, type Invoice } from '@/stores/invoicesStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
+import { useCustomersStore } from '@/stores/customersStore'
 import { elementToPdfBase64 } from '@/lib/emailClient'
 
 const FILAMENT_KINDS = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
@@ -32,6 +33,20 @@ export default function PublicQuoteView() {
   const addAdminAlert = useNotificationsStore((s) => s.addAdminAlert)
 
   const doc = useMemo(() => invoices.find((i) => i.id === id), [invoices, id])
+  // Look up the customer (by id or email) so we can detect existing portal access.
+  const customers = useCustomersStore((s) => s.customers)
+  const customer = useMemo(() => {
+    if (!doc) return undefined
+    if (doc.customerId) {
+      const byId = customers.find((c) => c.id === doc.customerId)
+      if (byId) return byId
+    }
+    if (doc.customerEmail) {
+      return customers.find((c) => c.email.toLowerCase() === doc.customerEmail.toLowerCase())
+    }
+    return undefined
+  }, [doc, customers])
+  const hasPortal = !!customer?.portalEnabled
   const [actionMode, setActionMode] = useState<ActionMode>(null)
   const [changesText, setChangesText] = useState('')
   const [accountForm, setAccountForm] = useState({ name: '', email: '', message: '' })
@@ -199,7 +214,10 @@ export default function PublicQuoteView() {
             </button>
           )}
           <p className="text-text-muted text-xs mt-6 font-mono">
-            Want to track this and future orders? <button onClick={() => setActionMode('account')} className="text-accent-amber hover:underline">Request a portal account</button>
+            {hasPortal
+              ? <>Track this order in your <a href="/portal" className="text-accent-amber hover:underline">Customer Portal</a>.</>
+              : <>Want to track this and future orders? <button onClick={() => setActionMode('account')} className="text-accent-amber hover:underline">Request a portal account</button></>
+            }
           </p>
           {/* Hidden printable element for PDF generation */}
           {accepted && (
@@ -247,13 +265,23 @@ export default function PublicQuoteView() {
           >
             <MessageSquare size={16} /> Request Changes
           </button>
-          <button
-            onClick={() => setActionMode('account')}
-            disabled={submitting}
-            className="btn-outline py-3 flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <UserPlus size={16} /> Request Account
-          </button>
+          {hasPortal ? (
+            <a
+              href="/portal"
+              className="btn-outline py-3 flex items-center justify-center gap-2"
+              title="You already have a Customer Portal account — sign in to track your orders."
+            >
+              <UserPlus size={16} /> Sign in to Portal
+            </a>
+          ) : (
+            <button
+              onClick={() => setActionMode('account')}
+              disabled={submitting}
+              className="btn-outline py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <UserPlus size={16} /> Request Account
+            </button>
+          )}
         </div>
       )}
 
