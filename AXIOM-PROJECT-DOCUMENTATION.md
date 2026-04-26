@@ -363,30 +363,48 @@ These are accessed directly via tokenised URLs sent in emails. **No authenticati
 
 ### Layout
 
-`src/admin/AdminLayout.tsx` — sidebar nav with sections:
+`src/admin/AdminLayout.tsx` — workflow-ordered sidebar with collapsible category dropdowns:
 
 ```
-─── PRIMARY ───
-🏠 Dashboard
-🔔 Notifications        (unread count badge)
-👥 Customers
-📋 Fulfillment          ← umbrella for Orders / Quotations / Print / Payment
-✉  Emails
-📊 Analytics
-🕐 Activity Log
-📦 Inventory            ← stock, products, movements, purchase orders, scan, reports
-🛒 Products             (storefront)
-👤 Team
-─── CMS ───
-Hero Section
-Services
-💲 Pricing              ← the engine
-About
-Contact
-─── ACTIONS ───
-🌐 View Site
-🔄 Reset All Data
-🚪 Logout
+Intake
+  Dashboard
+  Requests              (unread count badge)
+  Customers
+
+Fulfillment
+  Orders
+  Quotations
+  Print                 (Print Job Manager)
+  Payment               (Invoices)
+
+Stock & Storefront
+  Stock Overview
+  Stock Products
+  Movements
+  Purchase Orders
+  Scan
+  Reports
+  Storefront Products
+
+Pricing & Comms
+  Pricing Engine
+  Emails
+  Analytics
+
+Website
+  Hero Section
+  Services
+  About
+  Contact
+
+System
+  Team
+  Activity Log
+
+Actions
+  View Site
+  Reset All Data
+  Logout
 ```
 
 Each route is `lazy()`-loaded; `AdminLoader` shows an amber pulse while the chunk loads.
@@ -670,6 +688,15 @@ Order → Print + Payment → Delivery → Archive
 - Invoices are always part of **Payment**.
 - The Print Job Manager is part of **Print** and is exposed at `/admin/orders/print`.
 - Confirmation and tracking emails are part of **Order** unless the template is explicitly a quotation, invoice/payment, or delivery template.
+
+### Simpleness audit decisions
+
+- The sidebar follows the operational order instead of an alphabetic/tool list: **Intake → Fulfillment → Stock & Storefront → Pricing & Comms → Website → System**.
+- Request intake and off-the-shelf order notifications stay together under **Intake** because they are entry points, not separate fulfillment processes.
+- Quotations, Print Job Manager, and Payment are grouped under **Fulfillment** so staff do not jump between Orders, Inventory, and Invoices to locate one job.
+- `Inventory Products` is labelled **Stock Products** and public catalogue management is labelled **Storefront Products** to remove the previous "Products" ambiguity.
+- Pricing remains a supporting tool, not a fulfillment stage, and sits beside communications because it feeds quotations and customer documents.
+- Website CMS and System administration are deliberately outside the fulfillment route so operational staff can ignore them during daily production.
 
 ---
 

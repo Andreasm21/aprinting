@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BarChart3,
   Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock, Boxes, ClipboardList,
+  Printer,
 } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
@@ -107,19 +108,19 @@ export default function AdminDashboard() {
   }
 
   const cards = [
-    { label: 'Fulfillment', count: orders.length, icon: ClipboardList, path: '/admin/orders', color: 'amber' },
-    { label: 'Notifications', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
+    { label: 'Requests', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
     { label: 'Customers', count: customerCount, icon: Users, path: '/admin/customers', color: 'blue' },
-    { label: 'Payment', count: invoiceCount, icon: Receipt, path: '/admin/orders/invoices', color: 'amber' },
     { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/orders/quotations', color: 'blue' },
-    { label: 'Print', count: printJobs.length, icon: Boxes, path: '/admin/orders/print', color: 'blue' },
-    { label: 'Inventory', count: inventoryCount, icon: Boxes, path: '/admin/inventory', color: 'amber' },
-    { label: 'Analytics', icon: BarChart3, path: '/admin/analytics', color: 'green' },
+    { label: 'Orders', count: orders.length, icon: ClipboardList, path: '/admin/orders', color: 'amber' },
+    { label: 'Print', count: printJobs.length, icon: Printer, path: '/admin/orders/print', color: 'blue' },
+    { label: 'Payment', count: invoiceCount, icon: Receipt, path: '/admin/orders/invoices', color: 'amber' },
+    { label: 'Stock Overview', count: inventoryCount, icon: Boxes, path: '/admin/inventory', color: 'amber' },
+    { label: 'Storefront Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },
+    { label: 'Pricing Engine', icon: DollarSign, path: '/admin/pricing', color: 'green' },
     { label: 'Emails', icon: Mail, path: '/admin/emails', color: 'green' },
-    { label: 'Products', count: products.length, icon: Package, path: '/admin/products', color: 'amber' },
+    { label: 'Analytics', icon: BarChart3, path: '/admin/analytics', color: 'green' },
     { label: 'Hero Section', icon: FileText, path: '/admin/hero', color: 'blue' },
     { label: 'Services', icon: FileText, path: '/admin/services', color: 'amber' },
-    { label: 'Pricing', icon: DollarSign, path: '/admin/pricing', color: 'green' },
     { label: 'About', icon: Info, path: '/admin/about', color: 'blue' },
     { label: 'Contact', icon: MessageSquare, path: '/admin/contact', color: 'amber' },
   ]

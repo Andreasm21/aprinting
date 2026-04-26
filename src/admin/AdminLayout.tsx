@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, Lock, LogOut, Boxes, UserCog, History, ClipboardList } from 'lucide-react'
+import {
+  Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink,
+  Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, Lock, LogOut, Boxes,
+  UserCog, History, ClipboardList, ChevronDown, Inbox, Printer, Receipt,
+  ArrowLeftRight, Truck, ScanLine, FileBarChart,
+} from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
@@ -8,25 +13,103 @@ import { useAdminAuthStore } from '@/stores/adminAuthStore'
 import { useAuditLogStore } from '@/stores/auditLogStore'
 import bcrypt from 'bcryptjs'
 
-const navItems = [
-  { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/admin/notifications', label: 'Notifications', icon: Bell },
-  { path: '/admin/customers', label: 'Customers', icon: Users },
-  // Fulfillment is the umbrella — its sub-tabs (Orders, Quotations, Print, Payment)
-  // appear inside the page via OrdersLayout.
-  { path: '/admin/orders', label: 'Fulfillment', icon: ClipboardList },
-  { path: '/admin/emails', label: 'Emails', icon: Mail },
-  { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/admin/activity', label: 'Activity Log', icon: History },
-  { path: '/admin/inventory', label: 'Inventory', icon: Boxes },
-  { path: '/admin/products', label: 'Products', icon: Package },
-  { path: '/admin/team', label: 'Team', icon: UserCog },
-  { path: '/admin/hero', label: 'Hero Section', icon: FileText },
-  { path: '/admin/services', label: 'Services', icon: FileText },
-  { path: '/admin/pricing', label: 'Pricing', icon: DollarSign },
-  { path: '/admin/about', label: 'About', icon: Info },
-  { path: '/admin/contact', label: 'Contact', icon: MessageSquare },
+type NavItem = {
+  path: string
+  label: string
+  icon: typeof LayoutDashboard
+  exact?: boolean
+  badge?: 'notifications'
+  match?: (pathname: string) => boolean
+}
+
+type NavGroup = {
+  id: string
+  label: string
+  icon: typeof LayoutDashboard
+  defaultOpen?: boolean
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
+  {
+    id: 'intake',
+    label: 'Intake',
+    icon: Inbox,
+    defaultOpen: true,
+    items: [
+      { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+      { path: '/admin/notifications', label: 'Requests', icon: Bell, badge: 'notifications' },
+      { path: '/admin/customers', label: 'Customers', icon: Users },
+    ],
+  },
+  {
+    id: 'fulfillment',
+    label: 'Fulfillment',
+    icon: ClipboardList,
+    defaultOpen: true,
+    items: [
+      {
+        path: '/admin/orders',
+        label: 'Orders',
+        icon: ClipboardList,
+        match: (pathname) => pathname === '/admin/orders' || /^\/admin\/orders\/(?!quotations|print|invoices)/.test(pathname),
+      },
+      { path: '/admin/orders/quotations', label: 'Quotations', icon: FileText },
+      { path: '/admin/orders/print', label: 'Print', icon: Printer },
+      { path: '/admin/orders/invoices', label: 'Payment', icon: Receipt },
+    ],
+  },
+  {
+    id: 'stock',
+    label: 'Stock & Storefront',
+    icon: Boxes,
+    items: [
+      { path: '/admin/inventory', label: 'Stock Overview', icon: Boxes, exact: true },
+      { path: '/admin/inventory/products', label: 'Stock Products', icon: Package },
+      { path: '/admin/inventory/movements', label: 'Movements', icon: ArrowLeftRight },
+      { path: '/admin/inventory/orders', label: 'Purchase Orders', icon: Truck },
+      { path: '/admin/inventory/scan', label: 'Scan', icon: ScanLine },
+      { path: '/admin/inventory/reports', label: 'Reports', icon: FileBarChart },
+      { path: '/admin/products', label: 'Storefront Products', icon: Package },
+    ],
+  },
+  {
+    id: 'quotation-support',
+    label: 'Pricing & Comms',
+    icon: DollarSign,
+    items: [
+      { path: '/admin/pricing', label: 'Pricing Engine', icon: DollarSign },
+      { path: '/admin/emails', label: 'Emails', icon: Mail },
+      { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    id: 'website',
+    label: 'Website',
+    icon: FileText,
+    items: [
+      { path: '/admin/hero', label: 'Hero Section', icon: FileText },
+      { path: '/admin/services', label: 'Services', icon: FileText },
+      { path: '/admin/about', label: 'About', icon: Info },
+      { path: '/admin/contact', label: 'Contact', icon: MessageSquare },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'System',
+    icon: UserCog,
+    items: [
+      { path: '/admin/team', label: 'Team', icon: UserCog },
+      { path: '/admin/activity', label: 'Activity Log', icon: History },
+    ],
+  },
 ]
+
+function isNavItemActive(pathname: string, item: NavItem) {
+  if (item.match) return item.match(pathname)
+  if (item.exact) return pathname === item.path
+  return pathname === item.path || pathname.startsWith(`${item.path}/`)
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
@@ -48,6 +131,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => (
+    Object.fromEntries(navGroups.map((group) => [group.id, Boolean(group.defaultOpen)]))
+  ))
   // First-login password change state
   const [forcedPwOld, setForcedPwOld] = useState('')
   const [forcedPwNew, setForcedPwNew] = useState('')
@@ -298,28 +384,63 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const active = location.pathname === item.path
+        <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+          {navGroups.map((group) => {
+            const groupHasActiveItem = group.items.some((item) => isNavItemActive(location.pathname, item))
+            const groupOpen = openGroups[group.id] || groupHasActiveItem
+            const groupUnreadCount = group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0
+            const GroupIcon = group.icon
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-mono transition-all ${
-                  active
-                    ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                }`}
-              >
-                <item.icon size={18} />
-                {item.label}
-                {item.label === 'Notifications' && unreadCount > 0 && (
-                  <span className="ml-auto bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {unreadCount}
-                  </span>
+              <div key={group.id}>
+                <button
+                  type="button"
+                  aria-expanded={groupOpen}
+                  aria-controls={`admin-nav-${group.id}`}
+                  onClick={() => setOpenGroups((current) => ({ ...current, [group.id]: !current[group.id] }))}
+                  className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg text-xs font-mono uppercase tracking-wide transition-all ${
+                    groupHasActiveItem
+                      ? 'text-accent-amber bg-accent-amber/10'
+                      : 'text-text-muted hover:text-text-primary hover:bg-bg-tertiary'
+                  }`}
+                >
+                  <GroupIcon size={15} />
+                  <span className="flex-1 text-left">{group.label}</span>
+                  {groupUnreadCount > 0 && (
+                    <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                      {groupUnreadCount}
+                    </span>
+                  )}
+                  <ChevronDown size={14} className={`transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {groupOpen && (
+                  <div id={`admin-nav-${group.id}`} className="mt-1 space-y-1">
+                    {group.items.map((item) => {
+                      const active = isNavItemActive(location.pathname, item)
+                      const ItemIcon = item.icon
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-mono transition-all ${
+                            active
+                              ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20'
+                              : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                          }`}
+                        >
+                          <ItemIcon size={17} />
+                          <span className="flex-1">{item.label}</span>
+                          {item.badge === 'notifications' && unreadCount > 0 && (
+                            <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
                 )}
-              </Link>
+              </div>
             )
           })}
         </nav>
