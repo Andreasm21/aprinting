@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Receipt, Mail, BarChart3, Lock, LogOut, Boxes, UserCog, History } from 'lucide-react'
+import { Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink, Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, Lock, LogOut, Boxes, UserCog, History, ClipboardList } from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
@@ -12,8 +12,9 @@ const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/notifications', label: 'Notifications', icon: Bell },
   { path: '/admin/customers', label: 'Customers', icon: Users },
-  { path: '/admin/invoices', label: 'Invoices', icon: Receipt },
-  { path: '/admin/quotations', label: 'Quotations', icon: FileText },
+  // Orders is the umbrella — its sub-tabs (Overview, Quotations, Invoices)
+  // appear inside the page via OrdersLayout.
+  { path: '/admin/orders', label: 'Orders', icon: ClipboardList },
   { path: '/admin/emails', label: 'Emails', icon: Mail },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/admin/activity', label: 'Activity Log', icon: History },

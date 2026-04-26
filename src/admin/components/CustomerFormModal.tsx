@@ -1,7 +1,12 @@
 import { useState, useRef } from 'react'
-import { X, Check, User, Building2, Shield, Copy, RefreshCw, AlertTriangle, Clock, Plus, Trash2 } from 'lucide-react'
+import { X, Check, User, Building2, Shield, Copy, RefreshCw, AlertTriangle, Clock, Plus, Trash2, Mail, Loader2 } from 'lucide-react'
 import bcrypt from 'bcryptjs'
 import type { Customer, AccountType, PaymentTerms, DiscountTier, ExtraContact } from '@/stores/customersStore'
+import { sendEmail } from '@/lib/emailClient'
+import { portalCredentialsEmail } from '@/lib/emailTemplates'
+import { useEmailLogStore } from '@/stores/emailLogStore'
+import { useAdminAuthStore } from '@/stores/adminAuthStore'
+import { useCustomersStore } from '@/stores/customersStore'
 
 export const TAG_PRESETS = ['VIP', 'B2B', 'Wholesale', 'Recurring', 'Car Parts', 'Prototype', 'New']
 
@@ -65,6 +70,11 @@ export default function CustomerFormModal({
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [passwordHash, setPasswordHash] = useState(initial.passwordHash || '')
   const [copied, setCopied] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const logEmail = useEmailLogStore((s) => s.log)
+  const currentUser = useAdminAuthStore((s) => s.currentUser)
+  const updateCustomer = useCustomersStore((s) => s.updateCustomer)
   const [showVatWarning, setShowVatWarning] = useState(false)
   const vatInputRef = useRef<HTMLInputElement>(null)
 
@@ -76,6 +86,60 @@ export default function CustomerFormModal({
     const hash = await bcrypt.hash(pw, 10)
     setPasswordHash(hash)
     setCopied(false)
+  }
+
+  const sendCredentialsEmail = async () => {
+    if (!form.email || !generatedPassword) return
+    setEmailing(true)
+    setEmailResult(null)
+
+    // CRITICAL: persist the password hash to Supabase BEFORE sending the email.
+    // Otherwise the customer logs in with a hash that doesn't exist on their
+    // record yet (admin hadn't clicked the form's Save button).
+    if (initial.id) {
+      try {
+        await updateCustomer(initial.id, { passwordHash, portalEnabled: true })
+      } catch (err) {
+        console.error('[creds] failed to persist password hash:', err)
+        setEmailResult({ ok: false, msg: 'Could not save the password to the customer record. Try again.' })
+        setEmailing(false)
+        return
+      }
+    } else {
+      setEmailResult({ ok: false, msg: 'Save the customer first (click Save), then email credentials.' })
+      setEmailing(false)
+      return
+    }
+
+    const portalUrl = `${window.location.origin}/portal`
+    const tmpl = portalCredentialsEmail({
+      customerName: form.name || form.email,
+      email: form.email,
+      tempPassword: generatedPassword,
+      portalUrl,
+    })
+    const res = await sendEmail({
+      to: form.email,
+      subject: tmpl.subject,
+      html: tmpl.html,
+      text: tmpl.text,
+    })
+    await logEmail({
+      to: [form.email],
+      subject: tmpl.subject,
+      template: 'portal_credentials',
+      customerId: initial.id,
+      status: res.success ? 'sent' : 'failed',
+      error: res.error,
+      sentBy: currentUser?.username,
+    })
+    setEmailResult({
+      ok: res.success,
+      msg: res.success
+        ? `Credentials sent to ${form.email} — they include a link to the customer portal.`
+        : `Failed: ${res.error || 'unknown error'}`,
+    })
+    setEmailing(false)
   }
 
   const copyPassword = () => {
@@ -400,9 +464,26 @@ export default function CustomerFormModal({
                     <p className="text-accent-amber text-[11px] font-mono">
                       Copy this password now — it won't be shown again after saving.
                     </p>
-                    <button type="button" onClick={generatePassword} className="text-xs font-mono text-text-muted hover:text-accent-amber flex items-center gap-1">
-                      <RefreshCw size={10} /> Regenerate
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={generatePassword} className="text-xs font-mono text-text-muted hover:text-accent-amber flex items-center gap-1">
+                        <RefreshCw size={10} /> Regenerate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={sendCredentialsEmail}
+                        disabled={emailing || !form.email}
+                        className="text-xs font-mono text-accent-blue hover:text-accent-blue/80 flex items-center gap-1 disabled:opacity-40 ml-auto"
+                        title="Email these credentials and the portal link to the customer"
+                      >
+                        {emailing ? <Loader2 size={11} className="animate-spin" /> : <Mail size={11} />}
+                        {emailing ? 'Sending…' : 'Email credentials'}
+                      </button>
+                    </div>
+                    {emailResult && (
+                      <p className={`text-[11px] font-mono ${emailResult.ok ? 'text-accent-green' : 'text-red-400'}`}>
+                        {emailResult.ok ? '✓ ' : '✗ '}{emailResult.msg}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <button type="button" onClick={generatePassword} className="btn-amber text-xs py-1.5 px-3 flex items-center gap-1.5">

@@ -2,10 +2,11 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Camera, X, Car, Building2, FileText, Send,
   RotateCcw, ChevronRight, ChevronLeft, Check, Box,
-  Image as ImageIcon, Loader2, Cuboid, Upload, File
+  Image as ImageIcon, Loader2, Cuboid, Upload, File, ShoppingBag, Briefcase
 } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { useNotificationsStore } from '@/stores/notificationsStore'
+import { ContactFormContent } from './Contact'
 
 interface UploadedImage {
   id: string
@@ -339,6 +340,9 @@ function formatFileSize(bytes: number): string {
 export default function CustomPartRequest() {
   const ref = useScrollReveal<HTMLElement>()
   const addPartRequest = useNotificationsStore((s) => s.addPartRequest)
+  // Top-level mode: 'b2b' shows the full Custom Part wizard, 'shopper' shows
+  // a regular contact form for individual customers.
+  const [mode, setMode] = useState<'b2b' | 'shopper'>('b2b')
   const [step, setStep] = useState<Step>('upload')
   const [images, setImages] = useState<UploadedImage[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
@@ -421,16 +425,59 @@ export default function CustomPartRequest() {
 
   return (
     <section id="custom-part" ref={ref} className="py-20 md:py-28 bg-bg-primary">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12 reveal">
+      <div className={`${mode === 'shopper' ? 'max-w-7xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 lg:px-8`}>
+        <div className="text-center mb-8 reveal">
           <h2 className="section-title">
-            <span className="section-title-amber">CUSTOM PART REQUEST</span>
+            <span className="section-title-amber">{mode === 'b2b' ? 'CUSTOM PART REQUEST' : 'GET IN TOUCH'}</span>
           </h2>
           <p className="text-text-secondary mt-4 max-w-2xl mx-auto">
-            Upload photos of your part from multiple angles, or drop in an STL / 3D file. We'll quote you and print it.
-            <span className="block text-accent-amber font-mono text-sm mt-2">B2B & Automotive Specialists</span>
+            {mode === 'b2b'
+              ? <>Upload photos of your part from multiple angles, or drop in an STL / 3D file. We'll quote you and print it.<span className="block text-accent-amber font-mono text-sm mt-2">B2B & Automotive Specialists</span></>
+              : <>Have a question or a small print job? Send us a message and we'll get back to you.</>
+            }
           </p>
         </div>
+
+        {/* Big mode toggle — Business vs Shopper */}
+        <div className="flex justify-center mb-12 reveal">
+          <div className="inline-flex bg-bg-tertiary border border-border rounded-full p-1.5 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setMode('b2b')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full font-mono text-sm font-bold uppercase tracking-wider transition-all ${
+                mode === 'b2b'
+                  ? 'bg-accent-amber text-bg-primary shadow-md'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <Briefcase size={16} /> Business / Custom Part
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('shopper')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full font-mono text-sm font-bold uppercase tracking-wider transition-all ${
+                mode === 'shopper'
+                  ? 'bg-accent-amber text-bg-primary shadow-md'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <ShoppingBag size={16} /> Shopper / Inquiry
+            </button>
+          </div>
+        </div>
+
+        {/* Shopper mode → simple contact form. No `.reveal` wrapper:
+            the IntersectionObserver in useScrollReveal runs once on mount
+            and never sees content added later by toggling modes — leaving
+            it stuck at opacity:0. */}
+        {mode === 'shopper' && (
+          <div>
+            <ContactFormContent />
+          </div>
+        )}
+
+        {/* B2B mode → full wizard (everything below) */}
+        {mode === 'b2b' && (<>
 
         {/* Step indicator */}
         {step !== 'submitted' && (
@@ -596,15 +643,9 @@ export default function CustomPartRequest() {
                     <label className="block font-mono text-xs text-text-muted uppercase mb-1">Contact Name</label>
                     <input value={b2b.contactName} onChange={(e) => setB2B({ ...b2b, contactName: e.target.value })} className="input-field" />
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email</label>
-                      <input type="email" value={b2b.contactEmail} onChange={(e) => setB2B({ ...b2b, contactEmail: e.target.value })} className="input-field" />
-                    </div>
-                    <div>
-                      <label className="block font-mono text-xs text-text-muted uppercase mb-1">Phone</label>
-                      <input type="tel" value={b2b.contactPhone} onChange={(e) => setB2B({ ...b2b, contactPhone: e.target.value })} className="input-field" />
-                    </div>
+                  <div>
+                    <label className="block font-mono text-xs text-text-muted uppercase mb-1">Email</label>
+                    <input type="email" value={b2b.contactEmail} onChange={(e) => setB2B({ ...b2b, contactEmail: e.target.value })} className="input-field" />
                   </div>
                   <div>
                     <label className="block font-mono text-xs text-text-muted uppercase mb-1">Additional Notes</label>
@@ -702,9 +743,6 @@ export default function CustomPartRequest() {
                   <span className="text-text-primary font-accent">{b2b.contactName}</span>
                   <span className="text-text-muted">Email:</span>
                   <span className="text-text-primary font-accent">{b2b.contactEmail}</span>
-                  {b2b.contactPhone && (
-                    <><span className="text-text-muted">Phone:</span><span className="text-text-primary font-accent">{b2b.contactPhone}</span></>
-                  )}
                 </div>
               </div>
 
@@ -760,6 +798,7 @@ export default function CustomPartRequest() {
             </div>
           )}
         </div>
+        </>)}
       </div>
     </section>
   )

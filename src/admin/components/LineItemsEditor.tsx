@@ -94,7 +94,7 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
     const mat = materials.find((m) => m.label === materialLabel)
     if (!mat) return
     const next = [...items]
-    const item = { ...next[index], material: materialLabel, ratePerGram: mat.rate }
+    const item = { ...next[index], material: materialLabel, materialPartNumber: mat.partNumber, ratePerGram: mat.rate }
     if (item.weightGrams) {
       const ph = Number(getPrintHours(item)) || 0
       const lh = Number(getLabourHours(item)) || 0

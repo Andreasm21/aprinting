@@ -1,11 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { FileText, Plus, Eye, Trash2, Search, Check, X, Edit3, ChevronDown, ArrowRight, Receipt, Lock } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { FileText, Plus, Eye, Trash2, Search, Check, X, Edit3, ChevronDown, ArrowRight, Receipt, Lock, Send } from 'lucide-react'
 import { useInvoicesStore, CYPRUS_VAT_RATE, type Invoice, type InvoiceLineItem, type DocumentStatus } from '@/stores/invoicesStore'
-import { DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
+import OrdersLayout from './orders/OrdersLayout'
+import { DISCOUNT_RATES, type Customer, useCustomersStore } from '@/stores/customersStore'
 import CustomerSelector from './components/CustomerSelector'
 import LineItemsEditor from './components/LineItemsEditor'
 import DocumentPreview from './components/DocumentPreview'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
+import { sendEmail } from '@/lib/emailClient'
+import { quotationEmail } from '@/lib/emailTemplates'
+import { useEmailLogStore } from '@/stores/emailLogStore'
+import { useAdminAuthStore } from '@/stores/adminAuthStore'
 
 const STATUS_COLORS: Record<DocumentStatus, string> = {
   draft: 'text-text-muted border-border',
@@ -36,6 +42,9 @@ function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: 
 
 export default function AdminQuotations() {
   const { invoices, addInvoice, updateInvoice, deleteInvoice, getNextNumber, convertToInvoice } = useInvoicesStore()
+  const customers = useCustomersStore((s) => s.customers)
+  const logEmail = useEmailLogStore((s) => s.log)
+  const currentUser = useAdminAuthStore((s) => s.currentUser)
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | DocumentStatus>('all')
@@ -44,6 +53,7 @@ export default function AdminQuotations() {
   const [previewing, setPreviewing] = useState<Invoice | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; label: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [sendBanner, setSendBanner] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const quotesList = useMemo(() => {
     return invoices
@@ -99,14 +109,24 @@ export default function AdminQuotations() {
     }
   }, [invoices])
 
+  // When loaded under /admin/orders/quotations show the Orders subsection tabs;
+  // when loaded under the legacy /admin/quotations show the standalone header.
+  const location = useLocation()
+  const insideOrders = location.pathname.startsWith('/admin/orders')
+  const Wrapper = insideOrders ? OrdersLayout : (({ children }: { children: React.ReactNode }) => <div>{children}</div>)
+
   return (
-    <div>
+    <Wrapper>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-mono text-2xl font-bold text-text-primary flex items-center gap-2">
-            <FileText size={24} className="text-accent-blue" /> Quotations
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">Create and manage quotations for custom jobs.</p>
+          {!insideOrders && (
+            <>
+              <h1 className="font-mono text-2xl font-bold text-text-primary flex items-center gap-2">
+                <FileText size={24} className="text-accent-blue" /> Quotations
+              </h1>
+              <p className="text-text-secondary text-sm mt-1">Create and manage quotations for custom jobs.</p>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -264,18 +284,78 @@ export default function AdminQuotations() {
       {(creating || editing) && (
         <QuotationEditor
           initial={editing || undefined}
-          onSave={(data) => {
+          onSave={async (data, sendNow) => {
+            let savedId: string
             if (editing) {
               updateInvoice(editing.id, data)
+              savedId = editing.id
             } else {
-              addInvoice(data)
+              savedId = addInvoice(data)
             }
             setEditing(null)
             setCreating(false)
+
+            if (!sendNow) return
+            // Build the email and fire it. We use the just-saved data because
+            // the store update is async (Supabase upsert) — reading back from
+            // useInvoicesStore.getState() may race.
+            const saved: Invoice = { ...data, id: savedId, createdAt: new Date().toISOString() }
+            // Trim & validate email — Resend rejects strings with extra
+            // whitespace or non-ascii control chars with a generic 'string did
+            // not match expected pattern' error.
+            const toEmail = (saved.customerEmail || '').trim()
+            const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)
+            if (!toEmail || !emailOk) {
+              setSendBanner({ ok: false, msg: `Cannot send: customer email is missing or invalid (got "${toEmail}")` })
+              setTimeout(() => setSendBanner(null), 8000)
+              return
+            }
+            const customer = saved.customerId
+              ? customers.find((c) => c.id === saved.customerId)
+              : customers.find((c) => c.email.toLowerCase() === toEmail.toLowerCase())
+            const viewUrl = `${window.location.origin}/quote/${savedId}`
+            // If customer has portal access enabled, the email points them at
+            // the portal sign-in instead of pushing a new account creation.
+            const portalUrl = customer?.portalEnabled ? `${window.location.origin}/portal` : undefined
+            const tmpl = quotationEmail(saved, customer, viewUrl, portalUrl)
+            console.log('[save+send] sending to', toEmail, 'subject:', tmpl.subject, 'view url:', viewUrl)
+            const res = await sendEmail({
+              to: toEmail,
+              subject: tmpl.subject,
+              html: tmpl.html,
+              text: tmpl.text,
+            })
+            if (!res.success) console.error('[save+send] sendEmail failed:', res.error)
+            await logEmail({
+              to: [toEmail],
+              subject: tmpl.subject,
+              template: 'quotation',
+              documentId: savedId,
+              customerId: saved.customerId,
+              status: res.success ? 'sent' : 'failed',
+              error: res.error,
+              sentBy: currentUser?.username,
+            })
+            setSendBanner(res.success
+              ? { ok: true, msg: `Quotation ${data.documentNumber} emailed to ${saved.customerEmail}` }
+              : { ok: false, msg: `Failed to send: ${res.error || 'unknown error'}` })
+            setTimeout(() => setSendBanner(null), 6000)
           }}
           onClose={() => { setEditing(null); setCreating(false) }}
           getNextNumber={getNextNumber}
         />
+      )}
+
+      {/* Toast banner — send result after Save & Send */}
+      {sendBanner && (
+        <div className={`fixed bottom-6 right-6 z-[70] max-w-sm px-4 py-3 rounded-lg border shadow-xl font-mono text-xs ${
+          sendBanner.ok
+            ? 'bg-accent-green/10 border-accent-green/40 text-accent-green'
+            : 'bg-red-500/10 border-red-500/40 text-red-400'
+        }`}>
+          {sendBanner.ok ? '✓ ' : '✗ '}{sendBanner.msg}
+          <button onClick={() => setSendBanner(null)} className="ml-3 text-xs opacity-60 hover:opacity-100">×</button>
+        </div>
       )}
 
       {/* Preview */}
@@ -289,7 +369,7 @@ export default function AdminQuotations() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </Wrapper>
   )
 }
 
@@ -302,7 +382,7 @@ function QuotationEditor({
   getNextNumber,
 }: {
   initial?: Invoice
-  onSave: (data: Omit<Invoice, 'id' | 'createdAt'>) => void
+  onSave: (data: Omit<Invoice, 'id' | 'createdAt'>, sendNow: boolean) => void
   onClose: () => void
   getNextNumber: (type: 'quotation') => string
 }) {
@@ -364,36 +444,47 @@ function QuotationEditor({
     }))
   }
 
+  // Submit attempt opens the send-prompt — the actual save happens once the
+  // admin picks 'Save Draft' or 'Save & Send'.
+  const [showSendPrompt, setShowSendPrompt] = useState(false)
+
+  const buildPayload = (): Omit<Invoice, 'id' | 'createdAt'> => ({
+    type: 'quotation',
+    documentNumber: form.documentNumber,
+    date: form.date,
+    validUntil: form.validUntil,
+    customerId: form.customerId || undefined,
+    customerName: form.customerName,
+    customerEmail: form.customerEmail,
+    customerCompany: form.customerCompany || undefined,
+    customerVatNumber: form.customerVatNumber || undefined,
+    billingAddress: form.billingAddress,
+    billingCity: form.billingCity || undefined,
+    billingPostalCode: form.billingPostalCode || undefined,
+    lineItems: form.lineItems,
+    subtotal: totals.subtotal,
+    vatRate: effectiveVatRate,
+    vatAmount: totals.vatAmount,
+    totalOverride: form.overrideEnabled ? Number(form.totalOverride) : undefined,
+    deliveryFee: form.deliveryFee,
+    discountPercent: form.discountPercent,
+    discountAmount: totals.discountAmount,
+    extraCharge: form.extraCharge > 0 ? form.extraCharge : undefined,
+    extraChargeNote: form.extraCharge > 0 && form.extraChargeNote.trim() ? form.extraChargeNote.trim() : undefined,
+    total: totals.total,
+    notes: form.notes || undefined,
+    termsAndConditions: form.termsAndConditions || undefined,
+    status: form.status,
+  })
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({
-      type: 'quotation',
-      documentNumber: form.documentNumber,
-      date: form.date,
-      validUntil: form.validUntil,
-      customerId: form.customerId || undefined,
-      customerName: form.customerName,
-      customerEmail: form.customerEmail,
-      customerCompany: form.customerCompany || undefined,
-      customerVatNumber: form.customerVatNumber || undefined,
-      billingAddress: form.billingAddress,
-      billingCity: form.billingCity || undefined,
-      billingPostalCode: form.billingPostalCode || undefined,
-      lineItems: form.lineItems,
-      subtotal: totals.subtotal,
-      vatRate: effectiveVatRate,
-      vatAmount: totals.vatAmount,
-      totalOverride: form.overrideEnabled ? Number(form.totalOverride) : undefined,
-      deliveryFee: form.deliveryFee,
-      discountPercent: form.discountPercent,
-      discountAmount: totals.discountAmount,
-      extraCharge: form.extraCharge > 0 ? form.extraCharge : undefined,
-      extraChargeNote: form.extraCharge > 0 && form.extraChargeNote.trim() ? form.extraChargeNote.trim() : undefined,
-      total: totals.total,
-      notes: form.notes || undefined,
-      termsAndConditions: form.termsAndConditions || undefined,
-      status: form.status,
-    })
+    setShowSendPrompt(true)
+  }
+
+  const handleConfirm = (sendNow: boolean) => {
+    setShowSendPrompt(false)
+    onSave(buildPayload(), sendNow)
   }
 
   return (
@@ -593,6 +684,47 @@ function QuotationEditor({
           </div>
         </form>
       </div>
+
+      {/* Save prompt — appears after Submit, lets admin choose draft vs send-now */}
+      {showSendPrompt && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-bg-secondary border border-border rounded-lg max-w-md w-full p-6 space-y-5">
+            <div>
+              <h3 className="font-mono text-base font-bold text-text-primary">Send to customer now?</h3>
+              <p className="text-text-secondary text-xs mt-1.5">
+                {form.customerEmail
+                  ? <>The quote will be emailed to <span className="text-accent-amber font-mono">{form.customerEmail}</span> with a link to view & accept it online.</>
+                  : <span className="text-red-400">No customer email on this quote — only Save Draft is available.</span>
+                }
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleConfirm(true)}
+                disabled={!form.customerEmail}
+                className="btn-amber py-2.5 px-4 text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                <Send size={14} /> Save & Send to Customer
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirm(false)}
+                className="btn-outline py-2.5 px-4 text-sm flex items-center justify-center gap-2"
+              >
+                <Lock size={14} /> Save as Draft (don't send)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSendPrompt(false)}
+                className="text-text-muted text-xs font-mono hover:text-text-secondary mt-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

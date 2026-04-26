@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { FileText, Receipt, Eye, Package, ArrowLeft } from 'lucide-react'
+import { FileText, Receipt, Eye, Package, ArrowLeft, Download } from 'lucide-react'
 import { usePortalAuthStore } from '@/stores/portalAuthStore'
 import { useInvoicesStore, type Invoice, type DocumentStatus } from '@/stores/invoicesStore'
 import DocumentPreview from '@/admin/components/DocumentPreview'
@@ -80,6 +80,7 @@ export default function PortalDocuments() {
   const customer = usePortalAuthStore((s) => s.customer)
   const invoices = useInvoicesStore((s) => s.invoices)
   const [previewing, setPreviewing] = useState<Invoice | null>(null)
+  const [downloading, setDownloading] = useState<Invoice | null>(null)
 
   const customerDocs = useMemo(() => {
     if (!customer) return []
@@ -104,9 +105,22 @@ export default function PortalDocuments() {
         </div>
         <p className="text-[11px] text-text-muted">{formatDate(doc.date)} · €{doc.total.toFixed(2)}</p>
       </div>
-      <button onClick={() => setPreviewing(doc)} className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-amber">
-        <Eye size={14} />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setDownloading(doc)}
+          className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-amber"
+          title="Download PDF"
+        >
+          <Download size={14} />
+        </button>
+        <button
+          onClick={() => setPreviewing(doc)}
+          className="p-1.5 hover:bg-bg-tertiary rounded text-text-muted hover:text-accent-amber"
+          title="Preview"
+        >
+          <Eye size={14} />
+        </button>
+      </div>
     </div>
   )
 
@@ -151,6 +165,8 @@ export default function PortalDocuments() {
       )}
 
       {previewing && <DocumentPreview doc={previewing} onClose={() => setPreviewing(null)} />}
+      {/* Auto-download preview — opens, generates PDF, closes itself. */}
+      {downloading && <DocumentPreview doc={downloading} onClose={() => setDownloading(null)} autoDownload />}
     </div>
   )
 }

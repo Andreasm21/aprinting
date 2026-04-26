@@ -17,6 +17,7 @@ const CATEGORY_COLORS: Record<AuditCategory, string> = {
   customer: 'text-accent-blue bg-accent-blue/10',
   invoice: 'text-accent-amber bg-accent-amber/10',
   quotation: 'text-accent-blue bg-accent-blue/10',
+  order: 'text-purple-400 bg-purple-500/10',
   notification: 'text-accent-green bg-accent-green/10',
   product: 'text-accent-amber bg-accent-amber/10',
   content: 'text-text-muted bg-bg-tertiary',

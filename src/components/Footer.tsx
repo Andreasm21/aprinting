@@ -80,7 +80,8 @@ export default function Footer() {
             <a href="#" className="hover:text-accent-amber transition-colors">{t.footer.terms}</a>
             <span className="text-accent-amber">{t.footer.madeIn}</span>
             <a href="/portal" className="hover:text-text-secondary transition-colors">Customer Portal</a>
-            <a href="/admin" className="hover:text-text-secondary transition-colors">Admin Login</a>
+            {/* Admin login is intentionally not linked from the public site —
+                the route still works for direct navigation (/admin). */}
           </div>
         </div>
       </div>
