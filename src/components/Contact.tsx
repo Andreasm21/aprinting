@@ -35,7 +35,7 @@ export function ContactFormContent() {
   return (
     <div className="grid lg:grid-cols-2 gap-10">
           {/* Left — form */}
-          <div className="reveal">
+          <div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -95,7 +95,7 @@ export function ContactFormContent() {
           </div>
 
           {/* Right — quick contact */}
-          <div className="reveal flex flex-col gap-5" style={{ transitionDelay: '150ms' }}>
+          <div className="flex flex-col gap-5">
             {/* WhatsApp — temporarily hidden until we have a dedicated number */}
             {false && (
               <a

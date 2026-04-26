@@ -466,9 +466,12 @@ export default function CustomPartRequest() {
           </div>
         </div>
 
-        {/* Shopper mode → simple contact form. */}
+        {/* Shopper mode → simple contact form. No `.reveal` wrapper:
+            the IntersectionObserver in useScrollReveal runs once on mount
+            and never sees content added later by toggling modes — leaving
+            it stuck at opacity:0. */}
         {mode === 'shopper' && (
-          <div className="reveal">
+          <div>
             <ContactFormContent />
           </div>
         )}
