@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { X, Check } from 'lucide-react'
-import { CATEGORIES, type InventoryProduct, type InventoryCategory } from '@/stores/inventoryStore'
+import { X, Check, Package, Plus } from 'lucide-react'
+import { CATEGORIES, useInventoryStore, type InventoryProduct, type InventoryCategory } from '@/stores/inventoryStore'
+
+const FILAMENT_CATS: InventoryCategory[] = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 
 interface FormData {
   name: string
@@ -10,7 +12,10 @@ interface FormData {
   costPerKg: number
   bin: string
   barcode: string
-  initialQty: number
+  // For ADD mode: initial stock to seed.
+  // For EDIT mode: extra stock to add now (logged as a fresh IN movement).
+  // Units: kg for filaments, pieces for everything else.
+  qtyToAdd: number
 }
 
 // Generate a unique part number from brand + category + 4 random chars
@@ -28,7 +33,9 @@ export default function InventoryProductFormModal({
   title,
 }: {
   initial?: InventoryProduct
-  onSave: (data: Omit<InventoryProduct, 'id' | 'createdAt' | 'updatedAt'>, initialQty?: number) => void
+  // qtyToAdd is in storage units: GRAMS for filaments, PIECES for the rest.
+  // Always represents *new* stock to add (parent calls addMovement IN).
+  onSave: (data: Omit<InventoryProduct, 'id' | 'createdAt' | 'updatedAt'>, qtyToAdd?: number) => void
   onClose: () => void
   title: string
 }) {
@@ -45,13 +52,27 @@ export default function InventoryProductFormModal({
     costPerKg: initialCostPerKg,
     bin: initial?.bin || '',
     barcode: initial?.barcode || '',
-    initialQty: 1,
+    // Default: 1 (kg or piece) for new items, 0 for edits (don't accidentally add).
+    qtyToAdd: initial ? 0 : 1,
   })
+
+  // Show the current on-hand qty when editing so admin knows what's there.
+  const currentQty = useInventoryStore((s) => initial ? s.getQtyOnHand(initial.id) : 0)
+
+  const isFilament = FILAMENT_CATS.includes(form.category)
+  const inputUnit = isFilament ? 'kg' : 'pcs'
+  const storageUnit = isFilament ? 'g' : 'pcs'
+  const currentDisplayQty = isFilament ? currentQty : currentQty
+  const currentDisplayUnit = isFilament ? 'g' : 'pcs'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // We standardize on cost per kg. Store as cost (per kg) with unitWeightGrams=1000
-    // so the calculator math (cost / unitWeightGrams = cost/g) works correctly.
+    // Convert input qty to STORAGE units. Stock movements for filaments are
+    // tracked in grams (because consumeMaterial deducts grams). Non-filaments
+    // stay in pieces.
+    const qtyInStorageUnits = isFilament
+      ? Number(form.qtyToAdd) * 1000   // 1 kg → 1000 g
+      : Number(form.qtyToAdd) || 0
     onSave(
       {
         partNumber: initial?.partNumber || generatePartNumber(form.brand, form.category),
@@ -67,8 +88,7 @@ export default function InventoryProductFormModal({
         unitWeightGrams: 1000, // standardized: cost is per kg = per 1000g
         archived: initial?.archived || false,
       },
-      // Only pass initial qty when creating a new product. Editing doesn't change stock.
-      initial ? undefined : Number(form.initialQty) || 0,
+      qtyInStorageUnits > 0 ? qtyInStorageUnits : undefined,
     )
   }
 
@@ -173,24 +193,50 @@ export default function InventoryProductFormModal({
             </div>
           </div>
 
-          {/* Initial quantity (only when adding, not editing). Editing stock is via stock movements. */}
-          {!initial && (
-            <div>
-              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Quantity in Stock</label>
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={form.initialQty}
-                onChange={(e) => setForm({ ...form, initialQty: parseInt(e.target.value) || 0 })}
-                className="input-field text-sm font-mono"
-                placeholder="1"
-              />
-              <p className="text-[10px] text-text-muted font-mono mt-1">
-                Number of spools/units to add as starting stock. Logged as IN movement.
-              </p>
+          {/* Stock — always shown. ADD mode = initial stock, EDIT mode = restock. */}
+          <div className="bg-bg-tertiary/50 border border-border rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block font-mono text-xs text-text-muted uppercase flex items-center gap-1.5">
+                <Package size={12} className="text-accent-amber" />
+                {initial ? 'Add to stock' : 'Quantity in stock'}
+              </label>
+              {initial && (
+                <span className="text-[10px] font-mono text-text-muted">
+                  Currently on hand: <span className="text-text-primary font-bold">{currentDisplayQty.toFixed(0)} {currentDisplayUnit}</span>
+                </span>
+              )}
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  min={0}
+                  step={isFilament ? '0.1' : '1'}
+                  value={form.qtyToAdd}
+                  onChange={(e) => setForm({ ...form, qtyToAdd: parseFloat(e.target.value) || 0 })}
+                  className="input-field text-sm font-mono pr-12"
+                  placeholder={isFilament ? '1' : '10'}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs font-mono uppercase">{inputUnit}</span>
+              </div>
+              {initial && form.qtyToAdd > 0 && (
+                <span className="text-[11px] font-mono text-accent-green flex items-center gap-1 whitespace-nowrap">
+                  <Plus size={11} /> {(isFilament ? form.qtyToAdd * 1000 : form.qtyToAdd).toFixed(0)} {storageUnit}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-text-muted font-mono">
+              {initial
+                ? `Adds an IN movement for the new stock — leave at 0 if you're only editing other fields.`
+                : `Initial stock to seed when the product is created.`}
+              {isFilament && ' Filament is tracked in grams internally; enter kg here.'}
+            </p>
+            {initial && form.qtyToAdd > 0 && (
+              <p className="text-[10px] text-accent-amber font-mono">
+                After save → on hand will be {(currentDisplayQty + (isFilament ? form.qtyToAdd * 1000 : form.qtyToAdd)).toFixed(0)} {storageUnit}
+              </p>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <button type="button" onClick={onClose} className="btn-outline text-sm py-2 px-4">Cancel</button>
