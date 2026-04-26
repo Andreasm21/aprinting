@@ -7,6 +7,7 @@ export type AuditCategory =
   | 'customer'
   | 'invoice'
   | 'quotation'
+  | 'order'
   | 'notification'
   | 'product'
   | 'content'

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Bell, ShoppingCart, Car, MessageSquare, Trash2,
   CheckCheck, ChevronDown, ChevronUp, UserPlus, Receipt, FileText as FileTextIcon,
-  Package, Mail, Phone, MapPin, Clock, Building2, FileText, Check
+  Package, Mail, Phone, MapPin, Clock, Building2, FileText, Check, ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import {
   useNotificationsStore,
@@ -11,11 +12,13 @@ import {
   type OrderNotification,
   type PartRequestNotification,
   type ContactNotification,
+  type AdminAlertNotification,
   type NotificationType,
 } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import CustomerFormModal from './components/CustomerFormModal'
+import DeleteConfirmModal from './components/DeleteConfirmModal'
 
 type FilterType = 'all' | NotificationType
 
@@ -39,10 +42,11 @@ function formatDate(dateStr: string): string {
 }
 
 function TypeBadge({ type }: { type: NotificationType }) {
-  const config = {
+  const config: Record<NotificationType, { label: string; icon: typeof ShoppingCart; color: string }> = {
     order: { label: 'Order', icon: ShoppingCart, color: 'text-accent-green bg-accent-green/10 border-accent-green/20' },
     part_request: { label: 'Part Request', icon: Car, color: 'text-accent-blue bg-accent-blue/10 border-accent-blue/20' },
     contact: { label: 'Message', icon: MessageSquare, color: 'text-accent-amber bg-accent-amber/10 border-accent-amber/20' },
+    admin_alert: { label: 'Alert', icon: Bell, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
   }
   const { label, icon: Icon, color } = config[type]
   return (
@@ -206,6 +210,94 @@ function PartRequestDetail({ n, onCreateAccount, onCreateQuotation }: { n: PartR
   )
 }
 
+function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
+  const KIND_ICON = {
+    quote_accepted: Check,
+    quote_changes_requested: MessageSquare,
+    account_requested: UserPlus,
+    invoice_paid_cleanup: AlertTriangle,
+    other: Bell,
+  }
+  const KIND_COLOR: Record<AdminAlertNotification['kind'], string> = {
+    quote_accepted: 'text-accent-green',
+    quote_changes_requested: 'text-accent-amber',
+    account_requested: 'text-accent-blue',
+    invoice_paid_cleanup: 'text-accent-amber',
+    other: 'text-text-muted',
+  }
+  const Icon = KIND_ICON[n.kind] || Bell
+  const deleteInvoice = useInvoicesStore((s) => s.deleteInvoice)
+  const [confirmArchive, setConfirmArchive] = useState(false)
+  const [archived, setArchived] = useState(false)
+
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="bg-bg-tertiary rounded-lg p-4 space-y-2">
+        <div className={`flex items-center gap-2 text-xs font-mono uppercase ${KIND_COLOR[n.kind]}`}>
+          <Icon size={14} /> {n.kind.replace(/_/g, ' ')}
+        </div>
+        <p className="text-text-primary text-sm whitespace-pre-wrap">{n.message}</p>
+      </div>
+
+      {/* Context details */}
+      {n.context && Object.values(n.context).some(Boolean) && (
+        <div className="space-y-1.5 text-xs font-mono text-text-secondary">
+          {n.context.customerName && <div className="flex gap-2"><span className="text-text-muted w-20">Customer:</span><span>{n.context.customerName}</span></div>}
+          {n.context.customerEmail && <div className="flex gap-2"><span className="text-text-muted w-20">Email:</span><span>{n.context.customerEmail}</span></div>}
+          {n.context.quoteNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Quote:</span><span className="text-accent-amber">{n.context.quoteNumber}</span></div>}
+          {n.context.invoiceNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Invoice:</span><span className="text-accent-amber">{n.context.invoiceNumber}</span></div>}
+          {n.context.orderNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Order:</span><span className="text-accent-amber">{n.context.orderNumber}</span></div>}
+        </div>
+      )}
+
+      {/* Action buttons specific to each alert kind */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+        {n.context?.quoteId && (
+          <Link to={`/quote/${n.context.quoteId}`} target="_blank" rel="noopener" className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all">
+            <ExternalLink size={12} /> View public quote
+          </Link>
+        )}
+        {n.context?.invoiceId && (
+          <Link to={`/admin/orders/invoices`} className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all">
+            <Receipt size={12} /> Open invoices
+          </Link>
+        )}
+        {n.kind === 'invoice_paid_cleanup' && n.context?.quoteId && !archived && (
+          <button
+            onClick={() => setConfirmArchive(true)}
+            className="flex items-center gap-1.5 text-xs font-mono text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-red-400/30 transition-all"
+            title="Cancel the quote so the public link no longer works"
+          >
+            <Trash2 size={12} /> Archive public quote
+          </button>
+        )}
+        {archived && (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-accent-green px-3 py-1.5 rounded-lg bg-accent-green/5 border border-accent-green/20">
+            <Check size={12} /> Public link archived
+          </span>
+        )}
+      </div>
+
+      {confirmArchive && n.context?.quoteId && (
+        <DeleteConfirmModal
+          quick
+          verb="Archive"
+          label={`Public link for ${n.context.quoteNumber || n.context.quoteId} — the URL will return 'not found' after this.`}
+          onConfirm={async () => {
+            // Hard-delete the quotation row so the public /quote/:id URL
+            // can't resolve anything. The Order keeps its history snapshot
+            // (quote number, accepted date, total) so the timeline stays.
+            deleteInvoice(n.context!.quoteId!)
+            setArchived(true)
+            setConfirmArchive(false)
+          }}
+          onCancel={() => setConfirmArchive(false)}
+        />
+      )}
+    </div>
+  )
+}
+
 function ContactDetail({ n, onCreateAccount }: { n: ContactNotification; onCreateAccount: () => void }) {
   const existingCustomer = useCustomersStore((s) => s.getCustomerByEmail(n.email))
 
@@ -311,6 +403,8 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
     ? `New Order — €${(notification as OrderNotification).total.toFixed(2)}`
     : notification.type === 'part_request'
     ? `Part Request — ${(notification as PartRequestNotification).details.partName}`
+    : notification.type === 'admin_alert'
+    ? (notification as AdminAlertNotification).title
     : `Message from ${(notification as ContactNotification).name}`
 
   return (
@@ -366,6 +460,9 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
               onCreateAccount={() => setShowCustomerForm(true)}
             />
           )}
+          {notification.type === 'admin_alert' && (
+            <AdminAlertDetail n={notification as AdminAlertNotification} />
+          )}
         </div>
       )}
 
@@ -397,6 +494,7 @@ export default function AdminNotifications() {
     order: notifications.filter((n) => n.type === 'order').length,
     part_request: notifications.filter((n) => n.type === 'part_request').length,
     contact: notifications.filter((n) => n.type === 'contact').length,
+    admin_alert: notifications.filter((n) => n.type === 'admin_alert').length,
   }
 
   const handleClear = () => {
@@ -449,6 +547,7 @@ export default function AdminNotifications() {
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
         {([
           { key: 'all' as FilterType, label: 'All', icon: Bell },
+          { key: 'admin_alert' as FilterType, label: 'Alerts', icon: AlertTriangle },
           { key: 'order' as FilterType, label: 'Orders', icon: ShoppingCart },
           { key: 'part_request' as FilterType, label: 'Part Requests', icon: Car },
           { key: 'contact' as FilterType, label: 'Messages', icon: MessageSquare },

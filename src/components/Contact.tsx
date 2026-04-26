@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Send, MessageCircle, Mail, MapPin, Clock, Upload, Camera, ThumbsUp } from 'lucide-react'
+import { Send, MessageCircle, Mail, MapPin, Upload, Camera, ThumbsUp } from 'lucide-react'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 
-export default function Contact() {
+/** Inner contact form + side info — reusable across the standalone
+ *  Contact section AND the shopper-mode tab inside CustomPartRequest. */
+export function ContactFormContent() {
   const t = useTranslation()
-  const ref = useScrollReveal<HTMLElement>()
   const cc = useContentStore((s) => s.content.contact)
   const [formState, setFormState] = useState({
     name: '',
@@ -32,17 +33,9 @@ export default function Contact() {
   }
 
   return (
-    <section id="contact" ref={ref} className="py-20 md:py-28 bg-bg-secondary">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16 reveal">
-          <h2 className="section-title">
-            <span className="section-title-amber">{t.contact.title}</span>
-          </h2>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-10">
+    <div className="grid lg:grid-cols-2 gap-10">
           {/* Left — form */}
-          <div className="reveal">
+          <div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -102,24 +95,26 @@ export default function Contact() {
           </div>
 
           {/* Right — quick contact */}
-          <div className="reveal flex flex-col gap-5" style={{ transitionDelay: '150ms' }}>
-            {/* WhatsApp */}
-            <a
-              href={`https://wa.me/${cc.whatsappNumber.replace(/[^0-9+]/g, '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-accent-green/10 border border-accent-green/30 rounded-lg p-4 hover:bg-accent-green/20 transition-colors group"
-            >
-              <div className="w-12 h-12 bg-accent-green rounded-full flex items-center justify-center shrink-0">
-                <MessageCircle size={24} className="text-white" />
-              </div>
-              <div>
-                <p className="font-mono text-base font-bold text-text-primary group-hover:text-accent-green transition-colors">
-                  {t.contact.whatsapp}
-                </p>
-                <p className="text-text-secondary text-sm">{cc.whatsappNumber}</p>
-              </div>
-            </a>
+          <div className="flex flex-col gap-5">
+            {/* WhatsApp — temporarily hidden until we have a dedicated number */}
+            {false && (
+              <a
+                href={`https://wa.me/${cc.whatsappNumber.replace(/[^0-9+]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-accent-green/10 border border-accent-green/30 rounded-lg p-4 hover:bg-accent-green/20 transition-colors group"
+              >
+                <div className="w-12 h-12 bg-accent-green rounded-full flex items-center justify-center shrink-0">
+                  <MessageCircle size={24} className="text-white" />
+                </div>
+                <div>
+                  <p className="font-mono text-base font-bold text-text-primary group-hover:text-accent-green transition-colors">
+                    {t.contact.whatsapp}
+                  </p>
+                  <p className="text-text-secondary text-sm">{cc.whatsappNumber}</p>
+                </div>
+              </a>
+            )}
 
             {/* Contact details */}
             <div className="card-base space-y-5">
@@ -139,13 +134,7 @@ export default function Contact() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-accent-amber shrink-0" />
-                <div>
-                  <p className="text-text-muted text-xs font-mono uppercase">{t.contact.hours}</p>
-                  <p className="text-text-primary text-sm">{cc.hours}</p>
-                </div>
-              </div>
+              {/* Business Hours — temporarily hidden until we set fixed hours */}
             </div>
 
             {/* Social */}
@@ -171,7 +160,24 @@ export default function Contact() {
               </div>
             </div>
           </div>
+    </div>
+  )
+}
+
+/** Standalone Contact section (kept for compat — currently unused after
+ *  the Custom Part / Shopper toggle merged the two surfaces). */
+export default function Contact() {
+  const t = useTranslation()
+  const ref = useScrollReveal<HTMLElement>()
+  return (
+    <section id="contact" ref={ref} className="py-20 md:py-28 bg-bg-secondary">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16 reveal">
+          <h2 className="section-title">
+            <span className="section-title-amber">{t.contact.title}</span>
+          </h2>
         </div>
+        <ContactFormContent />
       </div>
     </section>
   )

@@ -9,8 +9,8 @@ import HowItWorks from '@/components/HowItWorks'
 import Machines from '@/components/Machines'
 import Portfolio from '@/components/Portfolio'
 import About from '@/components/About'
-import Contact from '@/components/Contact'
 import CustomPartRequest from '@/components/CustomPartRequest'
+import FindYourOrder from '@/components/FindYourOrder'
 import Footer from '@/components/Footer'
 import Cart from '@/components/Cart'
 import Checkout from '@/components/Checkout'
@@ -42,6 +42,10 @@ const InventoryScan = lazy(() => import('@/admin/inventory/InventoryScan'))
 const InventoryReports = lazy(() => import('@/admin/inventory/InventoryReports'))
 const InventoryOrders = lazy(() => import('@/admin/inventory/InventoryOrders'))
 const InventoryQueue = lazy(() => import('@/admin/inventory/InventoryQueue'))
+const AdminOrdersOverview = lazy(() => import('@/admin/orders/AdminOrdersOverview'))
+const AdminOrderProfile = lazy(() => import('@/admin/orders/AdminOrderProfile'))
+const PublicQuoteView = lazy(() => import('@/public/PublicQuoteView'))
+const PublicOrderTracking = lazy(() => import('@/public/PublicOrderTracking'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -81,9 +85,11 @@ function SitePage() {
         <HowItWorks />
         <Machines />
         <Portfolio />
-        <CustomPartRequest />
         <About />
-        <Contact />
+        <FindYourOrder />
+        {/* CustomPartRequest now contains a top-level Business / Shopper toggle —
+            shopper mode renders the contact form, so the standalone <Contact /> is gone. */}
+        <CustomPartRequest />
       </main>
       <Footer />
       <Cart />
@@ -97,6 +103,18 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<SitePage />} />
+        {/* Public quote viewer — no admin login, accessed by link from email */}
+        <Route path="/quote/:id" element={
+          <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading quote...</div></div>}>
+            <PublicQuoteView />
+          </Suspense>
+        } />
+        {/* Public order tracking */}
+        <Route path="/track/:id" element={
+          <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading order...</div></div>}>
+            <PublicOrderTracking />
+          </Suspense>
+        } />
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
@@ -112,6 +130,12 @@ function App() {
         <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
         <Route path="/admin/inventory/orders" element={<AdminLoader><InventoryOrders /></AdminLoader>} />
         <Route path="/admin/inventory/queue" element={<AdminLoader><InventoryQueue /></AdminLoader>} />
+        {/* Orders — overview + the existing Quotations / Invoices as subsections */}
+        <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
+        <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
+        <Route path="/admin/orders/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
+        <Route path="/admin/orders/:id" element={<AdminLoader><AdminOrderProfile /></AdminLoader>} />
+        {/* Legacy routes — redirect users who bookmarked the old paths */}
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />

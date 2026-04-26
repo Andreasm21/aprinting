@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
+import { useNotificationsStore } from './notificationsStore'
+import { useAdminAuthStore } from './adminAuthStore'
+import { useContentStore } from './contentStore'
+import { sendEmail } from '@/lib/emailClient'
+import { lowStockAlertEmail } from '@/lib/emailTemplates'
+import { useEmailLogStore } from './emailLogStore'
 
 export type MovementType = 'IN' | 'OUT' | 'ADJUST'
 export type StockStatus = 'OK' | 'LOW' | 'OUT'
@@ -15,12 +21,33 @@ export type InventoryCategory =
   | 'Packaging'     // boxes, tape, bubble wrap, mailers
   | 'Hardware'      // screws, M3/M4 bolts, threaded inserts, magnets
   | 'Finished'      // completed prints ready to ship
+  | string          // user-defined custom categories
 
-export const CATEGORIES: InventoryCategory[] = [
+export const FILAMENT_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'] as const
+
+export const CATEGORIES: string[] = [
   'PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon',
   'Tools', 'Spare Parts', 'Consumables', 'Equipment', 'Packaging',
   'Hardware', 'Finished',
 ]
+
+const CUSTOM_CATEGORIES_KEY = 'inventory_custom_categories'
+
+export function getCustomCategories(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_CATEGORIES_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomCategory(name: string): void {
+  const existing = getCustomCategories()
+  if (!existing.includes(name)) {
+    localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify([...existing, name]))
+  }
+}
 
 export interface InventoryProduct {
   id: string
@@ -57,6 +84,10 @@ interface InventoryState {
   loading: boolean
   addProduct: (data: Omit<InventoryProduct, 'id' | 'createdAt' | 'updatedAt'>) => string
   updateProduct: (id: string, updates: Partial<InventoryProduct>) => void
+  // Auto-deduct material consumed by an accepted quote. Records an OUT
+  // movement and triggers a low-stock alert if the on-hand qty crosses
+  // below the per-product reorderLevel (or the global low-stock %).
+  consumeMaterial: (partNumber: string, grams: number, reference?: string) => Promise<void>
   deleteProduct: (id: string) => void
   addMovement: (data: Omit<StockMovement, 'id' | 'createdAt'>) => string
   getQtyOnHand: (productId: string) => number
@@ -305,6 +336,87 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
         )
       }
       return id
+    },
+
+    consumeMaterial: async (partNumber, grams, reference) => {
+      if (!grams || grams <= 0) return
+      const product = get().products.find((p) => p.partNumber === partNumber)
+      if (!product) {
+        console.warn('[inventory] consumeMaterial: no product matches', partNumber)
+        return
+      }
+      const qtyBefore = get().getQtyOnHand(product.id)
+      // unitCost recorded on the OUT movement = cost per gram so reports show
+      // the COGS portion correctly.
+      const unitCost = (product.unitWeightGrams && product.unitWeightGrams > 0)
+        ? product.cost / product.unitWeightGrams
+        : 0
+      get().addMovement({
+        productId: product.id,
+        type: 'OUT',
+        qty: grams,
+        unitCost,
+        reference: reference || 'Quote accepted',
+        notes: `Auto-deducted ${grams}g for ${reference || 'accepted quote'}`,
+      })
+      const qtyAfter = qtyBefore - grams
+
+      // Compute the threshold: per-product reorderLevel wins, else the
+      // global low-stock % of the total stocked-in (sum of all IN movements).
+      const totalIn = get().movements
+        .filter((m) => m.productId === product.id && m.type === 'IN')
+        .reduce((sum, m) => sum + m.qty, 0)
+      const pct = useContentStore.getState().content.printPricing.lowStockPercent ?? 20
+      const threshold = product.reorderLevel > 0
+        ? product.reorderLevel
+        : totalIn * (pct / 100)
+
+      // Only fire when this movement CROSSED the threshold (was above, now
+      // at-or-below). Avoids spamming alerts while stock is already low.
+      if (qtyBefore > threshold && qtyAfter <= threshold) {
+        const isFilament = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'].includes(product.category)
+        const unit = isFilament ? 'g' : 'pcs'
+        // 1) In-app notification
+        void useNotificationsStore.getState().addAdminAlert({
+          kind: 'other',
+          title: `[LOW STOCK] ${product.partNumber} — ${product.name}`,
+          message: `${qtyAfter.toFixed(0)} ${unit} left (threshold ${threshold.toFixed(0)} ${unit}). Time to reorder.`,
+          context: { customerName: product.name },
+        })
+        // 2) Email to admins
+        const adminEmails = useAdminAuthStore.getState().users
+          .map((u) => u.email)
+          .filter((e): e is string => !!e && e.includes('@'))
+        const recipients = adminEmails.length > 0
+          ? Array.from(new Set([...adminEmails, 'team@axiomcreate.com']))
+          : ['team@axiomcreate.com']
+        const inventoryUrl = `${window.location.origin}/admin/inventory/products`
+        const tmpl = lowStockAlertEmail({
+          items: [{
+            partNumber: product.partNumber,
+            name: product.name,
+            category: product.category,
+            qtyOnHand: qtyAfter,
+            threshold,
+            unit,
+          }],
+          inventoryUrl,
+        })
+        const res = await sendEmail({
+          to: recipients,
+          subject: tmpl.subject,
+          html: tmpl.html,
+          text: tmpl.text,
+        })
+        await useEmailLogStore.getState().log({
+          to: recipients,
+          subject: tmpl.subject,
+          template: 'custom',
+          status: res.success ? 'sent' : 'failed',
+          error: res.error,
+          sentBy: 'system',
+        })
+      }
     },
 
     getQtyOnHand: (productId) => {

@@ -5,6 +5,8 @@ import { useCustomersStore } from './customersStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
+import { useOrdersStore } from './ordersStore'
+import { useInventoryStore } from './inventoryStore'
 
 export const CYPRUS_VAT_RATE = 0.19
 
@@ -14,6 +16,10 @@ export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled'
 export interface InvoiceLineItem {
   description: string
   material?: string
+  // Inventory product part number this material maps to. Set when a material
+  // is picked from the inventory dropdown — lets us deduct stock precisely
+  // when the quote is accepted.
+  materialPartNumber?: string
   weightGrams?: number
   ratePerGram?: number
   /** @deprecated use printHours + labourHours separately. Kept for legacy reads. */
@@ -249,6 +255,54 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         if (updates.status) {
           const cat = updated.type === 'quotation' ? 'quotation' as const : 'invoice' as const
           useAuditLogStore.getState().log('status_change', cat, `${updated.documentNumber} → ${updates.status}`, updated.customerName)
+
+          // Paid-invoice cleanup: if an INVOICE just became 'paid' and there's a
+          // linked quotation in the same chain, raise an admin alert prompting
+          // the admin to archive the now-stale public quote link.
+          const u = updated
+          if (u.type === 'invoice' && updates.status === 'paid') {
+            const orderForInvoice = useOrdersStore.getState().orders.find((o) => o.invoiceId === u.id)
+            const quoteId = orderForInvoice?.quotationId
+            const quote = quoteId ? get().invoices.find((i) => i.id === quoteId) : undefined
+            if (quote && quote.status !== 'cancelled') {
+              void useNotificationsStore.getState().addAdminAlert({
+                kind: 'invoice_paid_cleanup',
+                title: `${u.documentNumber} is paid — archive ${quote.documentNumber}?`,
+                message: `The invoice for ${u.customerName} has been marked paid. The public quote link for ${quote.documentNumber} is still live. Archive it so the link stops working?`,
+                context: {
+                  quoteId: quote.id,
+                  quoteNumber: quote.documentNumber,
+                  invoiceId: u.id,
+                  invoiceNumber: u.documentNumber,
+                  customerEmail: u.customerEmail,
+                  customerName: u.customerName,
+                  customerId: u.customerId,
+                },
+              })
+            }
+
+            // Update customer profile history: bump totalOrders/totalSpent
+            // and stamp lastOrderAt. Also drop a customer activity note so it
+            // shows up on the customer profile timeline.
+            if (u.customerId) {
+              const finalTotal = u.totalOverride ?? u.total
+              const customer = useCustomersStore.getState().customers.find((c) => c.id === u.customerId)
+              if (customer) {
+                void useCustomersStore.getState().updateCustomer(u.customerId, {
+                  totalOrders: (customer.totalOrders || 0) + 1,
+                  totalSpent: (customer.totalSpent || 0) + finalTotal,
+                  lastOrderAt: new Date().toISOString(),
+                })
+                void useActivitiesStore.getState().addActivity({
+                  customerId: u.customerId,
+                  type: 'order',
+                  title: `${u.documentNumber} paid`,
+                  description: `Invoice marked paid · €${finalTotal.toFixed(2)}`,
+                  metadata: { invoiceId: u.id, total: finalTotal },
+                })
+              }
+            }
+          }
         }
         if (updates.locked) {
           useAuditLogStore.getState().log('lock', 'invoice', `${updated.documentNumber} locked`, 'Set to view-only')
@@ -318,6 +372,49 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
       // Mark the quotation as accepted
       get().updateInvoice(quotationId, { status: 'paid' })
+
+      // Auto-deduct stock for any line items that have a materialPartNumber
+      // and a weightGrams. Skips legacy line items that pre-date the
+      // partNumber capture. Each consumeMaterial may also raise a
+      // low-stock alert if its movement crosses the threshold.
+      void (async () => {
+        const inv = useInventoryStore.getState()
+        for (const li of quote.lineItems) {
+          if (!li.materialPartNumber || !li.weightGrams) continue
+          const totalGrams = li.weightGrams * (li.quantity || 1)
+          await inv.consumeMaterial(li.materialPartNumber, totalGrams, quote.documentNumber)
+        }
+      })()
+
+      // Spin up the umbrella Order — but only if one doesn't already exist
+      // for this quotation (idempotent: re-converting won't create dupes).
+      const ordersStore = useOrdersStore.getState()
+      let orderId = ordersStore.getOrderByQuotationId(quotationId)?.id
+      if (!orderId) {
+        const orderNumber = ordersStore.getNextOrderNumber()
+        const finalTotal = quote.totalOverride ?? quote.total
+        const now = new Date().toISOString()
+        void ordersStore.addOrder({
+          orderNumber,
+          customerId: quote.customerId,
+          customerName: quote.customerName,
+          quotationId,
+          invoiceId,
+          status: 'pending',
+          total: finalTotal,
+          currency: 'EUR',
+          history: [
+            { type: 'quotation_sent', date: quote.createdAt, by: 'admin', quotationNumber: quote.documentNumber },
+            { type: 'quotation_accepted', date: now, by: 'admin', quotationNumber: quote.documentNumber },
+            { type: 'order_created', date: now, by: 'system' },
+            { type: 'invoice_generated', date: now, by: 'system', invoiceNumber },
+          ],
+        })
+      } else {
+        // Order already exists (idempotent path) — just attach the new invoice id.
+        void ordersStore.updateOrder(orderId, { invoiceId })
+        void ordersStore.appendEvent(orderId, { type: 'invoice_generated', by: 'system', invoiceNumber })
+      }
 
       // Auto-log conversion activity
       if (quote.customerId) {
@@ -464,3 +561,14 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
 // Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
 void fetchFromSupabase()
+
+// Realtime: customers accepting quotes flips status to 'paid' from a different
+// browser session — sync that back to the admin tab automatically.
+if (isSupabaseConfigured) {
+  supabase
+    .channel('documents-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+      void fetchFromSupabase()
+    })
+    .subscribe()
+}
