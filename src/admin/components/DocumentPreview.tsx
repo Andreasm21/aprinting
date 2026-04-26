@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Printer, Download, Mail } from 'lucide-react'
 import type { Invoice } from '@/stores/invoicesStore'
 import { useContentStore } from '@/stores/contentStore'
@@ -7,6 +7,9 @@ import SendEmailModal from './SendEmailModal'
 interface Props {
   doc: Invoice
   onClose: () => void
+  // When true, automatically trigger PDF download after the document renders
+  // (used by the portal's row-level Download button).
+  autoDownload?: boolean
 }
 
 // Strip brand / part-number / extra labels from a stored material string and
@@ -21,11 +24,12 @@ function filamentKindOnly(material: string): string {
   return material
 }
 
-export default function DocumentPreview({ doc, onClose }: Props) {
+export default function DocumentPreview({ doc, onClose, autoDownload }: Props) {
   const contact = useContentStore((s) => s.content.contact)
   const isQuote = doc.type === 'quotation'
   const [downloading, setDownloading] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
+  const autoTriggered = useRef(false)
 
   const handlePrint = () => {
     window.print()
@@ -91,6 +95,20 @@ export default function DocumentPreview({ doc, onClose }: Props) {
       setDownloading(false)
     }
   }
+
+  // Auto-trigger download once when opened with autoDownload (one-click flow
+  // from a portal row's Download button). Closes the modal afterwards.
+  useEffect(() => {
+    if (!autoDownload || autoTriggered.current) return
+    autoTriggered.current = true
+    // Wait one frame for the printable element to be in the DOM.
+    const t = setTimeout(async () => {
+      await handleDownloadPDF()
+      onClose()
+    }, 200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDownload])
 
   return (
     <div id="print-overlay" className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">

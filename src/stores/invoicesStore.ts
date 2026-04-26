@@ -250,6 +250,32 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         if (updates.status) {
           const cat = updated.type === 'quotation' ? 'quotation' as const : 'invoice' as const
           useAuditLogStore.getState().log('status_change', cat, `${updated.documentNumber} → ${updates.status}`, updated.customerName)
+
+          // Paid-invoice cleanup: if an INVOICE just became 'paid' and there's a
+          // linked quotation in the same chain, raise an admin alert prompting
+          // the admin to archive the now-stale public quote link.
+          const u = updated
+          if (u.type === 'invoice' && updates.status === 'paid') {
+            const orderForInvoice = useOrdersStore.getState().orders.find((o) => o.invoiceId === u.id)
+            const quoteId = orderForInvoice?.quotationId
+            const quote = quoteId ? get().invoices.find((i) => i.id === quoteId) : undefined
+            if (quote && quote.status !== 'cancelled') {
+              void useNotificationsStore.getState().addAdminAlert({
+                kind: 'invoice_paid_cleanup',
+                title: `${u.documentNumber} is paid — archive ${quote.documentNumber}?`,
+                message: `The invoice for ${u.customerName} has been marked paid. The public quote link for ${quote.documentNumber} is still live. Archive it so the link stops working?`,
+                context: {
+                  quoteId: quote.id,
+                  quoteNumber: quote.documentNumber,
+                  invoiceId: u.id,
+                  invoiceNumber: u.documentNumber,
+                  customerEmail: u.customerEmail,
+                  customerName: u.customerName,
+                  customerId: u.customerId,
+                },
+              })
+            }
+          }
         }
         if (updates.locked) {
           useAuditLogStore.getState().log('lock', 'invoice', `${updated.documentNumber} locked`, 'Set to view-only')

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Bell, ShoppingCart, Car, MessageSquare, Trash2,
   CheckCheck, ChevronDown, ChevronUp, UserPlus, Receipt, FileText as FileTextIcon,
-  Package, Mail, Phone, MapPin, Clock, Building2, FileText, Check
+  Package, Mail, Phone, MapPin, Clock, Building2, FileText, Check, ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import {
   useNotificationsStore,
@@ -11,6 +12,7 @@ import {
   type OrderNotification,
   type PartRequestNotification,
   type ContactNotification,
+  type AdminAlertNotification,
   type NotificationType,
 } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
@@ -207,6 +209,70 @@ function PartRequestDetail({ n, onCreateAccount, onCreateQuotation }: { n: PartR
   )
 }
 
+function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
+  const KIND_ICON = {
+    quote_accepted: Check,
+    quote_changes_requested: MessageSquare,
+    account_requested: UserPlus,
+    invoice_paid_cleanup: AlertTriangle,
+    other: Bell,
+  }
+  const KIND_COLOR: Record<AdminAlertNotification['kind'], string> = {
+    quote_accepted: 'text-accent-green',
+    quote_changes_requested: 'text-accent-amber',
+    account_requested: 'text-accent-blue',
+    invoice_paid_cleanup: 'text-accent-amber',
+    other: 'text-text-muted',
+  }
+  const Icon = KIND_ICON[n.kind] || Bell
+  const archiveQuote = useInvoicesStore((s) => s.updateInvoice)
+
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="bg-bg-tertiary rounded-lg p-4 space-y-2">
+        <div className={`flex items-center gap-2 text-xs font-mono uppercase ${KIND_COLOR[n.kind]}`}>
+          <Icon size={14} /> {n.kind.replace(/_/g, ' ')}
+        </div>
+        <p className="text-text-primary text-sm whitespace-pre-wrap">{n.message}</p>
+      </div>
+
+      {/* Context details */}
+      {n.context && Object.values(n.context).some(Boolean) && (
+        <div className="space-y-1.5 text-xs font-mono text-text-secondary">
+          {n.context.customerName && <div className="flex gap-2"><span className="text-text-muted w-20">Customer:</span><span>{n.context.customerName}</span></div>}
+          {n.context.customerEmail && <div className="flex gap-2"><span className="text-text-muted w-20">Email:</span><span>{n.context.customerEmail}</span></div>}
+          {n.context.quoteNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Quote:</span><span className="text-accent-amber">{n.context.quoteNumber}</span></div>}
+          {n.context.invoiceNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Invoice:</span><span className="text-accent-amber">{n.context.invoiceNumber}</span></div>}
+          {n.context.orderNumber && <div className="flex gap-2"><span className="text-text-muted w-20">Order:</span><span className="text-accent-amber">{n.context.orderNumber}</span></div>}
+        </div>
+      )}
+
+      {/* Action buttons specific to each alert kind */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+        {n.context?.quoteId && (
+          <Link to={`/quote/${n.context.quoteId}`} target="_blank" rel="noopener" className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all">
+            <ExternalLink size={12} /> View public quote
+          </Link>
+        )}
+        {n.context?.invoiceId && (
+          <Link to={`/admin/orders/invoices`} className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all">
+            <Receipt size={12} /> Open invoices
+          </Link>
+        )}
+        {n.kind === 'invoice_paid_cleanup' && n.context?.quoteId && (
+          <button
+            onClick={() => archiveQuote(n.context!.quoteId!, { status: 'cancelled' })}
+            className="flex items-center gap-1.5 text-xs font-mono text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-red-400/30 transition-all"
+            title="Cancel the quote so the public link no longer works"
+          >
+            <Trash2 size={12} /> Archive public quote
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ContactDetail({ n, onCreateAccount }: { n: ContactNotification; onCreateAccount: () => void }) {
   const existingCustomer = useCustomersStore((s) => s.getCustomerByEmail(n.email))
 
@@ -312,6 +378,8 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
     ? `New Order — €${(notification as OrderNotification).total.toFixed(2)}`
     : notification.type === 'part_request'
     ? `Part Request — ${(notification as PartRequestNotification).details.partName}`
+    : notification.type === 'admin_alert'
+    ? (notification as AdminAlertNotification).title
     : `Message from ${(notification as ContactNotification).name}`
 
   return (
@@ -366,6 +434,9 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
               n={notification as ContactNotification}
               onCreateAccount={() => setShowCustomerForm(true)}
             />
+          )}
+          {notification.type === 'admin_alert' && (
+            <AdminAlertDetail n={notification as AdminAlertNotification} />
           )}
         </div>
       )}
@@ -451,6 +522,7 @@ export default function AdminNotifications() {
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
         {([
           { key: 'all' as FilterType, label: 'All', icon: Bell },
+          { key: 'admin_alert' as FilterType, label: 'Alerts', icon: AlertTriangle },
           { key: 'order' as FilterType, label: 'Orders', icon: ShoppingCart },
           { key: 'part_request' as FilterType, label: 'Part Requests', icon: Car },
           { key: 'contact' as FilterType, label: 'Messages', icon: MessageSquare },
