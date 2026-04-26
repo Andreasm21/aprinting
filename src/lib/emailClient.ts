@@ -25,18 +25,38 @@ export interface SendEmailResult {
 
 /** Call the serverless email endpoint. */
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
+  // Log what we're about to send so we can spot bad inputs in the browser console.
+  console.log('[sendEmail] →', {
+    to: opts.to,
+    cc: opts.cc,
+    subject: opts.subject,
+    htmlBytes: opts.html?.length,
+    textBytes: opts.text?.length,
+    attachments: opts.attachments?.map((a) => ({ filename: a.filename, contentBytes: a.content.length })),
+  })
+  let body: string
+  try {
+    body = JSON.stringify(opts)
+  } catch (err) {
+    console.error('[sendEmail] JSON.stringify failed:', err)
+    return { success: false, error: 'Could not serialize email payload — ' + (err instanceof Error ? err.message : 'unknown') }
+  }
   try {
     const res = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(opts),
+      body,
     })
-    const json = await res.json()
+    let json: { id?: string; error?: string; details?: unknown } = {}
+    try { json = await res.json() } catch { /* tolerate empty body */ }
     if (!res.ok) {
+      console.error('[sendEmail] server error:', res.status, json)
       return { success: false, error: json.error || `HTTP ${res.status}` }
     }
+    console.log('[sendEmail] ✓ id', json.id)
     return { success: true, id: json.id }
   } catch (err) {
+    console.error('[sendEmail] fetch threw:', err)
     return { success: false, error: err instanceof Error ? err.message : 'Network error' }
   }
 }

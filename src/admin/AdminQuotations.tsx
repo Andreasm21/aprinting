@@ -300,17 +300,29 @@ export default function AdminQuotations() {
             // the store update is async (Supabase upsert) — reading back from
             // useInvoicesStore.getState() may race.
             const saved: Invoice = { ...data, id: savedId, createdAt: new Date().toISOString() }
+            // Trim & validate email — Resend rejects strings with extra
+            // whitespace or non-ascii control chars with a generic 'string did
+            // not match expected pattern' error.
+            const toEmail = (saved.customerEmail || '').trim()
+            const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)
+            if (!toEmail || !emailOk) {
+              setSendBanner({ ok: false, msg: `Cannot send: customer email is missing or invalid (got "${toEmail}")` })
+              setTimeout(() => setSendBanner(null), 8000)
+              return
+            }
             const customer = saved.customerId ? customers.find((c) => c.id === saved.customerId) : undefined
             const viewUrl = `${window.location.origin}/quote/${savedId}`
             const tmpl = quotationEmail(saved, customer, viewUrl)
+            console.log('[save+send] sending to', toEmail, 'subject:', tmpl.subject, 'view url:', viewUrl)
             const res = await sendEmail({
-              to: saved.customerEmail,
+              to: toEmail,
               subject: tmpl.subject,
               html: tmpl.html,
               text: tmpl.text,
             })
+            if (!res.success) console.error('[save+send] sendEmail failed:', res.error)
             await logEmail({
-              to: [saved.customerEmail],
+              to: [toEmail],
               subject: tmpl.subject,
               template: 'quotation',
               documentId: savedId,
