@@ -15,12 +15,33 @@ export type InventoryCategory =
   | 'Packaging'     // boxes, tape, bubble wrap, mailers
   | 'Hardware'      // screws, M3/M4 bolts, threaded inserts, magnets
   | 'Finished'      // completed prints ready to ship
+  | string          // user-defined custom categories
 
-export const CATEGORIES: InventoryCategory[] = [
+export const FILAMENT_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'] as const
+
+export const CATEGORIES: string[] = [
   'PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon',
   'Tools', 'Spare Parts', 'Consumables', 'Equipment', 'Packaging',
   'Hardware', 'Finished',
 ]
+
+const CUSTOM_CATEGORIES_KEY = 'inventory_custom_categories'
+
+export function getCustomCategories(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_CATEGORIES_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomCategory(name: string): void {
+  const existing = getCustomCategories()
+  if (!existing.includes(name)) {
+    localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify([...existing, name]))
+  }
+}
 
 export interface InventoryProduct {
   id: string
