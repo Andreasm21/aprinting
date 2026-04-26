@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/emailClient'
 import { portalCredentialsEmail } from '@/lib/emailTemplates'
 import { useEmailLogStore } from '@/stores/emailLogStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
+import { useCustomersStore } from '@/stores/customersStore'
 
 export const TAG_PRESETS = ['VIP', 'B2B', 'Wholesale', 'Recurring', 'Car Parts', 'Prototype', 'New']
 
@@ -73,6 +74,7 @@ export default function CustomerFormModal({
   const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const logEmail = useEmailLogStore((s) => s.log)
   const currentUser = useAdminAuthStore((s) => s.currentUser)
+  const updateCustomer = useCustomersStore((s) => s.updateCustomer)
   const [showVatWarning, setShowVatWarning] = useState(false)
   const vatInputRef = useRef<HTMLInputElement>(null)
 
@@ -90,6 +92,25 @@ export default function CustomerFormModal({
     if (!form.email || !generatedPassword) return
     setEmailing(true)
     setEmailResult(null)
+
+    // CRITICAL: persist the password hash to Supabase BEFORE sending the email.
+    // Otherwise the customer logs in with a hash that doesn't exist on their
+    // record yet (admin hadn't clicked the form's Save button).
+    if (initial.id) {
+      try {
+        await updateCustomer(initial.id, { passwordHash, portalEnabled: true })
+      } catch (err) {
+        console.error('[creds] failed to persist password hash:', err)
+        setEmailResult({ ok: false, msg: 'Could not save the password to the customer record. Try again.' })
+        setEmailing(false)
+        return
+      }
+    } else {
+      setEmailResult({ ok: false, msg: 'Save the customer first (click Save), then email credentials.' })
+      setEmailing(false)
+      return
+    }
+
     const portalUrl = `${window.location.origin}/portal`
     const tmpl = portalCredentialsEmail({
       customerName: form.name || form.email,
