@@ -18,6 +18,7 @@ import {
 import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import CustomerFormModal from './components/CustomerFormModal'
+import DeleteConfirmModal from './components/DeleteConfirmModal'
 
 type FilterType = 'all' | NotificationType
 
@@ -226,6 +227,8 @@ function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
   }
   const Icon = KIND_ICON[n.kind] || Bell
   const archiveQuote = useInvoicesStore((s) => s.updateInvoice)
+  const [confirmArchive, setConfirmArchive] = useState(false)
+  const [archived, setArchived] = useState(false)
 
   return (
     <div className="space-y-3 mt-4">
@@ -259,16 +262,35 @@ function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
             <Receipt size={12} /> Open invoices
           </Link>
         )}
-        {n.kind === 'invoice_paid_cleanup' && n.context?.quoteId && (
+        {n.kind === 'invoice_paid_cleanup' && n.context?.quoteId && !archived && (
           <button
-            onClick={() => archiveQuote(n.context!.quoteId!, { status: 'cancelled' })}
+            onClick={() => setConfirmArchive(true)}
             className="flex items-center gap-1.5 text-xs font-mono text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-red-400/30 transition-all"
             title="Cancel the quote so the public link no longer works"
           >
             <Trash2 size={12} /> Archive public quote
           </button>
         )}
+        {archived && (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-accent-green px-3 py-1.5 rounded-lg bg-accent-green/5 border border-accent-green/20">
+            <Check size={12} /> Public link archived
+          </span>
+        )}
       </div>
+
+      {confirmArchive && n.context?.quoteId && (
+        <DeleteConfirmModal
+          quick
+          verb="Archive"
+          label={`Public link for ${n.context.quoteNumber || n.context.quoteId}`}
+          onConfirm={async () => {
+            archiveQuote(n.context!.quoteId!, { status: 'cancelled' })
+            setArchived(true)
+            setConfirmArchive(false)
+          }}
+          onCancel={() => setConfirmArchive(false)}
+        />
+      )}
     </div>
   )
 }

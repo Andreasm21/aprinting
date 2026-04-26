@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, ArrowRight, ClipboardList, FileText, Receipt, Package } from 'lucide-react'
+import { Search, ArrowRight, ClipboardList, FileText, Receipt, Package, Trash2 } from 'lucide-react'
 import { useOrdersStore, ORDER_STATUS_LABEL, type OrderStatus } from '@/stores/ordersStore'
 import OrdersLayout from './OrdersLayout'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending: 'text-accent-amber bg-accent-amber/10 border-accent-amber/30',
@@ -19,8 +20,10 @@ const STATUS_FILTERS: ('all' | OrderStatus)[] = ['all', 'pending', 'in_productio
 export default function AdminOrdersOverview() {
   const orders = useOrdersStore((s) => s.orders)
   const loading = useOrdersStore((s) => s.loading)
+  const deleteOrder = useOrdersStore((s) => s.deleteOrder)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | OrderStatus>('all')
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null)
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -100,7 +103,7 @@ export default function AdminOrdersOverview() {
                 <th className="py-3 px-4 text-right">Total</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Created</th>
-                <th className="py-3 px-4 w-10"></th>
+                <th className="py-3 px-4 w-20 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -124,15 +127,39 @@ export default function AdminOrdersOverview() {
                     {new Date(o.createdAt).toLocaleDateString('en-GB')}
                   </td>
                   <td className="py-3 px-4">
-                    <Link to={`/admin/orders/${o.id}`} className="text-accent-amber hover:text-accent-amber/80 inline-block">
-                      <ArrowRight size={16} />
-                    </Link>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        to={`/admin/orders/${o.id}`}
+                        className="p-1.5 rounded text-text-muted hover:text-accent-amber hover:bg-bg-tertiary"
+                        title="Open order"
+                      >
+                        <ArrowRight size={14} />
+                      </Link>
+                      <button
+                        onClick={() => setDeleteTarget({ id: o.id, label: `${o.orderNumber} — ${o.customerName}` })}
+                        className="p-1.5 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10"
+                        title="Delete order (does NOT delete the linked quote/invoice)"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          label={deleteTarget.label}
+          onConfirm={async () => {
+            await deleteOrder(deleteTarget.id)
+            setDeleteTarget(null)
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
 
       <p className="text-[10px] text-text-muted font-mono mt-4 flex items-center gap-1.5">

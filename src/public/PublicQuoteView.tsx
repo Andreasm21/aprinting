@@ -81,8 +81,22 @@ export default function PublicQuoteView() {
     )
   }
 
+  // Cancelled / archived → public link no longer works.
+  if (doc.status === 'cancelled') {
+    return (
+      <PageShell>
+        <div className="card-base p-10 text-center max-w-lg mx-auto">
+          <AlertCircle size={36} className="mx-auto text-text-muted/40 mb-4" />
+          <h2 className="font-mono text-lg text-text-primary mb-2">This quote is no longer available</h2>
+          <p className="text-text-secondary text-sm">The link has been archived. If you have questions, reach out at <a href="mailto:team@axiomcreate.com" className="text-accent-amber underline">team@axiomcreate.com</a>.</p>
+          <Link to="/" className="inline-block mt-6 text-accent-amber font-mono text-sm hover:underline">← Back to axiomcreate.com</Link>
+        </div>
+      </PageShell>
+    )
+  }
+
   // Already accepted → show confirmation directly so they don't accept twice.
-  const alreadyAccepted = doc.status === 'paid' || doc.status === 'cancelled'
+  const alreadyAccepted = doc.status === 'paid'
 
   const handleAccept = async () => {
     setSubmitting(true)
