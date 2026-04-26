@@ -41,6 +41,8 @@ const InventoryScan = lazy(() => import('@/admin/inventory/InventoryScan'))
 const InventoryReports = lazy(() => import('@/admin/inventory/InventoryReports'))
 const InventoryOrders = lazy(() => import('@/admin/inventory/InventoryOrders'))
 const InventoryQueue = lazy(() => import('@/admin/inventory/InventoryQueue'))
+const AdminOrdersOverview = lazy(() => import('@/admin/orders/AdminOrdersOverview'))
+const AdminOrderProfile = lazy(() => import('@/admin/orders/AdminOrderProfile'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -112,6 +114,12 @@ function App() {
         <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
         <Route path="/admin/inventory/orders" element={<AdminLoader><InventoryOrders /></AdminLoader>} />
         <Route path="/admin/inventory/queue" element={<AdminLoader><InventoryQueue /></AdminLoader>} />
+        {/* Orders — overview + the existing Quotations / Invoices as subsections */}
+        <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
+        <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
+        <Route path="/admin/orders/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
+        <Route path="/admin/orders/:id" element={<AdminLoader><AdminOrderProfile /></AdminLoader>} />
+        {/* Legacy routes — redirect users who bookmarked the old paths */}
         <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />

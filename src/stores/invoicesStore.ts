@@ -5,6 +5,7 @@ import { useCustomersStore } from './customersStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
+import { useOrdersStore } from './ordersStore'
 
 export const CYPRUS_VAT_RATE = 0.19
 
@@ -318,6 +319,36 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
       // Mark the quotation as accepted
       get().updateInvoice(quotationId, { status: 'paid' })
+
+      // Spin up the umbrella Order — but only if one doesn't already exist
+      // for this quotation (idempotent: re-converting won't create dupes).
+      const ordersStore = useOrdersStore.getState()
+      let orderId = ordersStore.getOrderByQuotationId(quotationId)?.id
+      if (!orderId) {
+        const orderNumber = ordersStore.getNextOrderNumber()
+        const finalTotal = quote.totalOverride ?? quote.total
+        const now = new Date().toISOString()
+        void ordersStore.addOrder({
+          orderNumber,
+          customerId: quote.customerId,
+          customerName: quote.customerName,
+          quotationId,
+          invoiceId,
+          status: 'pending',
+          total: finalTotal,
+          currency: 'EUR',
+          history: [
+            { type: 'quotation_sent', date: quote.createdAt, by: 'admin', quotationNumber: quote.documentNumber },
+            { type: 'quotation_accepted', date: now, by: 'admin', quotationNumber: quote.documentNumber },
+            { type: 'order_created', date: now, by: 'system' },
+            { type: 'invoice_generated', date: now, by: 'system', invoiceNumber },
+          ],
+        })
+      } else {
+        // Order already exists (idempotent path) — just attach the new invoice id.
+        void ordersStore.updateOrder(orderId, { invoiceId })
+        void ordersStore.appendEvent(orderId, { type: 'invoice_generated', by: 'system', invoiceNumber })
+      }
 
       // Auto-log conversion activity
       if (quote.customerId) {

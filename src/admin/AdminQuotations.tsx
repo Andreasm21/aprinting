@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { FileText, Plus, Eye, Trash2, Search, Check, X, Edit3, ChevronDown, ArrowRight, Receipt, Lock } from 'lucide-react'
 import { useInvoicesStore, CYPRUS_VAT_RATE, type Invoice, type InvoiceLineItem, type DocumentStatus } from '@/stores/invoicesStore'
+import OrdersLayout from './orders/OrdersLayout'
 import { DISCOUNT_RATES, type Customer } from '@/stores/customersStore'
 import CustomerSelector from './components/CustomerSelector'
 import LineItemsEditor from './components/LineItemsEditor'
@@ -99,14 +101,24 @@ export default function AdminQuotations() {
     }
   }, [invoices])
 
+  // When loaded under /admin/orders/quotations show the Orders subsection tabs;
+  // when loaded under the legacy /admin/quotations show the standalone header.
+  const location = useLocation()
+  const insideOrders = location.pathname.startsWith('/admin/orders')
+  const Wrapper = insideOrders ? OrdersLayout : (({ children }: { children: React.ReactNode }) => <div>{children}</div>)
+
   return (
-    <div>
+    <Wrapper>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-mono text-2xl font-bold text-text-primary flex items-center gap-2">
-            <FileText size={24} className="text-accent-blue" /> Quotations
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">Create and manage quotations for custom jobs.</p>
+          {!insideOrders && (
+            <>
+              <h1 className="font-mono text-2xl font-bold text-text-primary flex items-center gap-2">
+                <FileText size={24} className="text-accent-blue" /> Quotations
+              </h1>
+              <p className="text-text-secondary text-sm mt-1">Create and manage quotations for custom jobs.</p>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -289,7 +301,7 @@ export default function AdminQuotations() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </Wrapper>
   )
 }
 
