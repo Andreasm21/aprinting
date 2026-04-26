@@ -291,7 +291,21 @@ export default function InventoryProducts() {
         <InventoryProductFormModal
           title={`Edit ${editing.partNumber}`}
           initial={editing}
-          onSave={(data) => { updateProduct(editing.id, data); setEditing(null) }}
+          onSave={(data, qtyToAdd) => {
+            updateProduct(editing.id, data)
+            // Restock — qtyToAdd already in storage units (g for filaments, pcs otherwise).
+            if (qtyToAdd && qtyToAdd > 0) {
+              addMovement({
+                productId: editing.id,
+                type: 'IN',
+                qty: qtyToAdd,
+                unitCost: (data.unitWeightGrams && data.unitWeightGrams > 0) ? data.cost / data.unitWeightGrams : data.cost,
+                notes: 'Manual restock from edit',
+                reference: 'restock',
+              })
+            }
+            setEditing(null)
+          }}
           onClose={() => setEditing(null)}
         />
       )}
