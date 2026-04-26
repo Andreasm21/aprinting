@@ -44,6 +44,7 @@ const InventoryQueue = lazy(() => import('@/admin/inventory/InventoryQueue'))
 const AdminOrdersOverview = lazy(() => import('@/admin/orders/AdminOrdersOverview'))
 const AdminOrderProfile = lazy(() => import('@/admin/orders/AdminOrderProfile'))
 const PublicQuoteView = lazy(() => import('@/public/PublicQuoteView'))
+const PublicOrderTracking = lazy(() => import('@/public/PublicOrderTracking'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -104,6 +105,12 @@ function App() {
         <Route path="/quote/:id" element={
           <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading quote...</div></div>}>
             <PublicQuoteView />
+          </Suspense>
+        } />
+        {/* Public order tracking */}
+        <Route path="/track/:id" element={
+          <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading order...</div></div>}>
+            <PublicOrderTracking />
           </Suspense>
         } />
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />

@@ -275,6 +275,28 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
                 },
               })
             }
+
+            // Update customer profile history: bump totalOrders/totalSpent
+            // and stamp lastOrderAt. Also drop a customer activity note so it
+            // shows up on the customer profile timeline.
+            if (u.customerId) {
+              const finalTotal = u.totalOverride ?? u.total
+              const customer = useCustomersStore.getState().customers.find((c) => c.id === u.customerId)
+              if (customer) {
+                void useCustomersStore.getState().updateCustomer(u.customerId, {
+                  totalOrders: (customer.totalOrders || 0) + 1,
+                  totalSpent: (customer.totalSpent || 0) + finalTotal,
+                  lastOrderAt: new Date().toISOString(),
+                })
+                void useActivitiesStore.getState().addActivity({
+                  customerId: u.customerId,
+                  type: 'order',
+                  title: `${u.documentNumber} paid`,
+                  description: `Invoice marked paid · €${finalTotal.toFixed(2)}`,
+                  metadata: { invoiceId: u.id, total: finalTotal },
+                })
+              }
+            }
           }
         }
         if (updates.locked) {

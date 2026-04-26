@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ClipboardList, FileText, Receipt, User, Calendar,
-  CheckCircle2, Circle, MessageSquare,
+  CheckCircle2, Circle, MessageSquare, Link as LinkIcon, Copy, Check,
 } from 'lucide-react'
 import { useOrdersStore, ORDER_STATUS_FLOW, ORDER_STATUS_LABEL, type OrderStatus, type OrderEvent } from '@/stores/ordersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
@@ -59,6 +59,7 @@ export default function AdminOrderProfile() {
 
   const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
 
   if (!order) {
     return (
@@ -114,7 +115,38 @@ export default function AdminOrderProfile() {
         <h1 className="font-mono text-3xl font-bold text-accent-amber flex items-center gap-3">
           <ClipboardList size={28} /> {order.orderNumber}
         </h1>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-text-muted text-xs font-mono">
+
+        {/* Public tracking link — copy & share with the customer */}
+        <div className="card-base bg-accent-blue/5 border-accent-blue/30 p-3 mt-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <LinkIcon size={14} className="text-accent-blue shrink-0" />
+            <code className="font-mono text-xs text-text-secondary truncate">{`${window.location.origin}/track/${order.id}`}</code>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/track/${order.id}`
+                navigator.clipboard.writeText(url)
+                setLinkCopied(true)
+                setTimeout(() => setLinkCopied(false), 1500)
+              }}
+              className="text-xs font-mono text-accent-blue hover:text-accent-blue/80 px-3 py-1.5 rounded-lg border border-accent-blue/40 hover:bg-accent-blue/10 flex items-center gap-1.5"
+            >
+              {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+              {linkCopied ? 'Copied' : 'Copy link'}
+            </button>
+            <a
+              href={`/track/${order.id}`}
+              target="_blank"
+              rel="noopener"
+              className="text-xs font-mono text-text-muted hover:text-text-primary px-3 py-1.5 rounded-lg border border-border hover:bg-bg-tertiary flex items-center gap-1.5"
+            >
+              Open
+            </a>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-text-muted text-xs font-mono">
           <span className="flex items-center gap-1"><User size={12} /> {order.customerName}</span>
           <span className="flex items-center gap-1"><Calendar size={12} /> Created {formatDateTime(order.createdAt)}</span>
           <span>Total: <span className="text-accent-amber font-bold">€{order.total.toFixed(2)}</span></span>
