@@ -117,12 +117,17 @@ export default function DocumentPreview({ doc, onClose, autoDownload }: Props) {
         <div className="flex items-center justify-between p-4 border-b print:hidden">
           <h2 className="font-mono text-sm font-bold text-gray-800">Preview — {doc.documentNumber}</h2>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowEmail(true)}
-              className="flex items-center gap-1.5 text-xs font-mono bg-blue-500 text-white px-3 py-1.5 rounded hover:bg-blue-600"
-            >
-              <Mail size={13} /> Send by Email
-            </button>
+            {/* Send by Email is admin-only — never expose this to a portal
+                customer. Detect by current path: /admin/* shows it, /portal/*
+                hides it. autoDownload mode also hides it (silent generator). */}
+            {window.location.pathname.startsWith('/admin') && !autoDownload && (
+              <button
+                onClick={() => setShowEmail(true)}
+                className="flex items-center gap-1.5 text-xs font-mono bg-blue-500 text-white px-3 py-1.5 rounded hover:bg-blue-600"
+              >
+                <Mail size={13} /> Send by Email
+              </button>
+            )}
             <button
               onClick={handleDownloadPDF}
               disabled={downloading}
