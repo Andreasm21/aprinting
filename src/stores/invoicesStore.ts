@@ -521,3 +521,14 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
 // Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
 void fetchFromSupabase()
+
+// Realtime: customers accepting quotes flips status to 'paid' from a different
+// browser session — sync that back to the admin tab automatically.
+if (isSupabaseConfigured) {
+  supabase
+    .channel('documents-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+      void fetchFromSupabase()
+    })
+    .subscribe()
+}

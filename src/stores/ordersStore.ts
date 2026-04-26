@@ -156,6 +156,20 @@ async function sbDelete(id: string): Promise<void> {
   if (error) console.error('[orders] delete error:', error)
 }
 
+/** Subscribe to realtime updates so the admin tab sees new orders and
+ *  status changes the moment a customer accepts a quote. */
+function subscribeRealtime(): void {
+  if (!isSupabaseConfigured) return
+  supabase
+    .channel('orders-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+      // Re-fetch on every change — simpler than reconciling individual events.
+      void fetchFromSupabase()
+      console.log('[orders] realtime change:', payload.eventType)
+    })
+    .subscribe()
+}
+
 async function fetchFromSupabase(): Promise<void> {
   if (!isSupabaseConfigured) {
     useOrdersStore.setState({ loading: false })
@@ -269,3 +283,4 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
 
 // Kick off initial Supabase fetch AFTER the store is fully assigned (avoids TDZ).
 void fetchFromSupabase()
+subscribeRealtime()

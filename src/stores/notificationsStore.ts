@@ -225,6 +225,18 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
   // Kick off a Supabase fetch as soon as the store is created.
   fetchFromSupabase(set)
 
+  // Realtime: re-fetch on every notifications-table change so the bell
+  // icon lights up the moment a customer accepts a quote, requests
+  // changes, etc. (driven from the public quote page).
+  if (isSupabaseConfigured) {
+    supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        void fetchFromSupabase(set)
+      })
+      .subscribe()
+  }
+
   return {
     notifications: [],
     loading: true,
