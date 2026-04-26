@@ -9,7 +9,6 @@ import HowItWorks from '@/components/HowItWorks'
 import Machines from '@/components/Machines'
 import Portfolio from '@/components/Portfolio'
 import About from '@/components/About'
-import Contact from '@/components/Contact'
 import CustomPartRequest from '@/components/CustomPartRequest'
 import Footer from '@/components/Footer'
 import Cart from '@/components/Cart'
@@ -81,9 +80,10 @@ function SitePage() {
         <HowItWorks />
         <Machines />
         <Portfolio />
-        <CustomPartRequest />
         <About />
-        <Contact />
+        {/* CustomPartRequest now contains a top-level Business / Shopper toggle —
+            shopper mode renders the contact form, so the standalone <Contact /> is gone. */}
+        <CustomPartRequest />
       </main>
       <Footer />
       <Cart />

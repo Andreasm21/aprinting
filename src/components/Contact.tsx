@@ -5,9 +5,10 @@ import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 
-export default function Contact() {
+/** Inner contact form + side info — reusable across the standalone
+ *  Contact section AND the shopper-mode tab inside CustomPartRequest. */
+export function ContactFormContent() {
   const t = useTranslation()
-  const ref = useScrollReveal<HTMLElement>()
   const cc = useContentStore((s) => s.content.contact)
   const [formState, setFormState] = useState({
     name: '',
@@ -32,15 +33,7 @@ export default function Contact() {
   }
 
   return (
-    <section id="contact" ref={ref} className="py-20 md:py-28 bg-bg-secondary">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16 reveal">
-          <h2 className="section-title">
-            <span className="section-title-amber">{t.contact.title}</span>
-          </h2>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-10">
+    <div className="grid lg:grid-cols-2 gap-10">
           {/* Left — form */}
           <div className="reveal">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -167,7 +160,24 @@ export default function Contact() {
               </div>
             </div>
           </div>
+    </div>
+  )
+}
+
+/** Standalone Contact section (kept for compat — currently unused after
+ *  the Custom Part / Shopper toggle merged the two surfaces). */
+export default function Contact() {
+  const t = useTranslation()
+  const ref = useScrollReveal<HTMLElement>()
+  return (
+    <section id="contact" ref={ref} className="py-20 md:py-28 bg-bg-secondary">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16 reveal">
+          <h2 className="section-title">
+            <span className="section-title-amber">{t.contact.title}</span>
+          </h2>
         </div>
+        <ContactFormContent />
       </div>
     </section>
   )
