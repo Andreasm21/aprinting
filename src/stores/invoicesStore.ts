@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
 import { useOrdersStore } from './ordersStore'
+import { useInventoryStore } from './inventoryStore'
 
 export const CYPRUS_VAT_RATE = 0.19
 
@@ -15,6 +16,10 @@ export type DocumentStatus = 'draft' | 'sent' | 'paid' | 'cancelled'
 export interface InvoiceLineItem {
   description: string
   material?: string
+  // Inventory product part number this material maps to. Set when a material
+  // is picked from the inventory dropdown — lets us deduct stock precisely
+  // when the quote is accepted.
+  materialPartNumber?: string
   weightGrams?: number
   ratePerGram?: number
   /** @deprecated use printHours + labourHours separately. Kept for legacy reads. */
@@ -367,6 +372,19 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
 
       // Mark the quotation as accepted
       get().updateInvoice(quotationId, { status: 'paid' })
+
+      // Auto-deduct stock for any line items that have a materialPartNumber
+      // and a weightGrams. Skips legacy line items that pre-date the
+      // partNumber capture. Each consumeMaterial may also raise a
+      // low-stock alert if its movement crosses the threshold.
+      void (async () => {
+        const inv = useInventoryStore.getState()
+        for (const li of quote.lineItems) {
+          if (!li.materialPartNumber || !li.weightGrams) continue
+          const totalGrams = li.weightGrams * (li.quantity || 1)
+          await inv.consumeMaterial(li.materialPartNumber, totalGrams, quote.documentNumber)
+        }
+      })()
 
       // Spin up the umbrella Order — but only if one doesn't already exist
       // for this quotation (idempotent: re-converting won't create dupes).

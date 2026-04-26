@@ -153,6 +153,19 @@ export default function AdminPricing() {
                 className="input-field text-sm font-mono"
               />
             </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Low-stock threshold (% of stocked-in)</label>
+              <input
+                type="number"
+                step="1"
+                min={1}
+                max={100}
+                value={pp.lowStockPercent ?? 20}
+                onChange={(e) => updateContent('printPricing', { lowStockPercent: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono"
+              />
+              <p className="text-[10px] text-text-muted font-mono mt-1">Used when a product has no per-item reorder level. Default 20% — alert fires when crossing.</p>
+            </div>
           </div>
         </div>
       </div>

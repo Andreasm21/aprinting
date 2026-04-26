@@ -47,6 +47,7 @@ export interface SiteContent {
     profitMarkup: number          // % (e.g. 30 = +30% on top of COGS)
     defaultPowerDraw: number      // kW
     defaultLabourHours: number    // hours of human work per job (default)
+    lowStockPercent: number       // % of stock baseline below which to alert (default 20)
   }
 }
 
@@ -122,6 +123,7 @@ const defaultContent: SiteContent = {
     profitMarkup: 30,
     defaultPowerDraw: 0.45,
     defaultLabourHours: 1,
+    lowStockPercent: 20,
   },
 }
 

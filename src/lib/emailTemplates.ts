@@ -252,6 +252,63 @@ export function orderTrackingEmail(opts: {
   }
 }
 
+/** Internal low-stock alert sent to admins when an inventory item drops
+ *  at-or-below the per-product reorderLevel (or the global low-stock %). */
+export function lowStockAlertEmail(opts: {
+  items: Array<{
+    partNumber: string
+    name: string
+    category: string
+    qtyOnHand: number       // current units (grams for filaments)
+    threshold: number       // the level we crossed under
+    unit?: string           // e.g. 'g' for filaments, 'pcs' otherwise
+  }>
+  inventoryUrl: string
+}): { subject: string; html: string; text: string } {
+  const rows = opts.items.map((it) => `
+    <tr style="border-top:1px solid ${COLORS.border};">
+      <td style="padding:10px 0; font-family:${fontStack}; font-size:12px; color:${COLORS.amber};">${escape(it.partNumber)}</td>
+      <td style="padding:10px 12px; font-size:13px; color:${COLORS.text};">${escape(it.name)}<div style="font-size:10px; color:${COLORS.textMuted}; margin-top:2px;">${escape(it.category)}</div></td>
+      <td style="padding:10px 0; font-family:${fontStack}; font-size:13px; color:${COLORS.text}; text-align:right; white-space:nowrap;">
+        <span style="color:#F87171; font-weight:bold;">${it.qtyOnHand.toFixed(0)}</span> ${escape(it.unit || '')}
+        <div style="font-size:10px; color:${COLORS.textMuted}; margin-top:2px;">threshold ${it.threshold.toFixed(0)} ${escape(it.unit || '')}</div>
+      </td>
+    </tr>
+  `).join('')
+
+  const body = `
+    <p style="margin:0 0 16px 0;">Hey team,</p>
+    <p style="margin:0 0 16px 0;">${opts.items.length === 1 ? 'An inventory item has' : `${opts.items.length} inventory items have`} crossed below the low-stock threshold. Time to reorder.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.bgRow}; border:1px solid ${COLORS.border}; border-radius:6px; margin:16px 0; overflow:hidden;">
+      <thead>
+        <tr>
+          <th style="padding:10px 0; text-align:left; font-family:${fontStack}; font-size:10px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em;">Part #</th>
+          <th style="padding:10px 12px; text-align:left; font-family:${fontStack}; font-size:10px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em;">Item</th>
+          <th style="padding:10px 0; text-align:right; font-family:${fontStack}; font-size:10px; color:${COLORS.textMuted}; text-transform:uppercase; letter-spacing:0.1em;">On hand</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin:16px 0 0 0; font-size:12px; color:${COLORS.textMuted};">This alert fires the moment an item crosses the threshold — not while it's already low.</p>
+  `
+
+  return {
+    subject: opts.items.length === 1
+      ? `[LOW STOCK] ${opts.items[0].partNumber} — ${opts.items[0].name}`
+      : `[LOW STOCK] ${opts.items.length} items below threshold`,
+    html: shell({
+      preheader: `${opts.items.length} item${opts.items.length === 1 ? '' : 's'} need reordering`,
+      title: opts.items.length === 1 ? 'Low stock alert' : `Low stock — ${opts.items.length} items`,
+      body,
+      ctaLabel: 'Open Inventory',
+      ctaUrl: opts.inventoryUrl,
+    }),
+    text: `Low stock alert — ${opts.items.length} item${opts.items.length === 1 ? '' : 's'} below threshold:\n\n` +
+      opts.items.map((it) => `  ${it.partNumber} — ${it.name} (${it.category}): ${it.qtyOnHand.toFixed(0)} ${it.unit || ''} on hand, threshold ${it.threshold.toFixed(0)}`).join('\n') +
+      `\n\nManage inventory: ${opts.inventoryUrl}`,
+  }
+}
+
 /** Free-form email composed by the admin. */
 export function customEmail(opts: { subject: string; bodyHtml: string }): { subject: string; html: string; text: string } {
   return {
