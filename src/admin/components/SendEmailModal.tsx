@@ -35,7 +35,9 @@ export default function SendEmailModal({ doc, pdfElementId, onClose }: Props) {
     setSending(true)
     setResult(null)
     try {
-      // Generate PDF attachment from the rendered document.
+      // Generate PDF attachment from the rendered document. PDF generation
+      // (html2canvas + jsPDF) can throw on certain CSS — isolate it so the
+      // user can choose to send without the attachment if it fails.
       let attachments
       if (attachPdf) {
         const el = document.getElementById(pdfElementId) as HTMLElement | null
@@ -44,8 +46,16 @@ export default function SendEmailModal({ doc, pdfElementId, onClose }: Props) {
           setSending(false)
           return
         }
-        const att = await elementToPdfBase64(el, doc.documentNumber)
-        attachments = [att]
+        try {
+          const att = await elementToPdfBase64(el, doc.documentNumber)
+          attachments = [att]
+        } catch (pdfErr) {
+          console.error('[SendEmailModal] PDF generation failed:', pdfErr)
+          const msg = pdfErr instanceof Error ? pdfErr.message : 'unknown'
+          setResult({ ok: false, msg: `Could not render PDF (${msg}). Untick 'Attach PDF' and try again — the email will go without it.` })
+          setSending(false)
+          return
+        }
       }
 
       const toList = to.split(',').map((s) => s.trim()).filter(Boolean)
