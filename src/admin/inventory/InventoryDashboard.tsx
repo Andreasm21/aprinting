@@ -1,7 +1,14 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Package, TrendingUp, Clock, ArrowDownLeft, ArrowUpRight, RotateCcw, Euro } from 'lucide-react'
-import { useInventoryStore, CATEGORIES, type MovementType } from '@/stores/inventoryStore'
+import {
+  CATEGORIES,
+  formatStockQty,
+  getMovementValue,
+  getStockLineValue,
+  useInventoryStore,
+  type MovementType,
+} from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -34,6 +41,7 @@ function MovementIcon({ type }: { type: MovementType }) {
 }
 
 export default function InventoryDashboard() {
+  const [now] = useState(() => Date.now())
   const products = useInventoryStore((s) => s.products)
   const movements = useInventoryStore((s) => s.movements)
   const getQtyOnHand = useInventoryStore((s) => s.getQtyOnHand)
@@ -41,19 +49,19 @@ export default function InventoryDashboard() {
 
   const stats = useMemo(() => {
     let totalValue = 0
-    let totalUnits = 0
+    let stockedSkus = 0
     let lowStock = 0
     let outOfStock = 0
 
     for (const p of products) {
       const qty = getQtyOnHand(p.id)
-      totalValue += qty * p.cost
-      totalUnits += Math.max(0, qty)
+      totalValue += getStockLineValue(p, Math.max(0, qty))
+      if (qty > 0) stockedSkus++
       if (qty <= 0) outOfStock++
       else if (qty <= p.reorderLevel) lowStock++
     }
 
-    return { totalValue, totalUnits, skus: products.length, lowStock, outOfStock }
+    return { totalValue, stockedSkus, skus: products.length, lowStock, outOfStock }
   }, [products, getQtyOnHand])
 
   const lowStockItems = useMemo(() => {
@@ -68,7 +76,7 @@ export default function InventoryDashboard() {
   const categoryBreakdown = useMemo(() => {
     return CATEGORIES.map((cat) => {
       const items = products.filter((p) => p.category === cat)
-      const value = items.reduce((sum, p) => sum + getQtyOnHand(p.id) * p.cost, 0)
+      const value = items.reduce((sum, p) => sum + getStockLineValue(p, Math.max(0, getQtyOnHand(p.id))), 0)
       return { category: cat, value, color: CATEGORY_COLORS[cat] }
     }).filter((c) => c.value > 0)
   }, [products, getQtyOnHand])
@@ -78,25 +86,30 @@ export default function InventoryDashboard() {
   const recentMovements = useMemo(() => movements.slice(0, 8), [movements])
 
   const topMovers = useMemo(() => {
-    const now = Date.now()
     const thirtyDaysAgo = now - 30 * 86400000
-    const counts = new Map<string, number>()
+    const counts = new Map<string, { qty: number; value: number }>()
     for (const m of movements) {
       if (m.type !== 'OUT') continue
       if (new Date(m.createdAt).getTime() < thirtyDaysAgo) continue
-      counts.set(m.productId, (counts.get(m.productId) || 0) + m.qty)
+      const p = products.find((product) => product.id === m.productId)
+      const existing = counts.get(m.productId) || { qty: 0, value: 0 }
+      counts.set(m.productId, {
+        qty: existing.qty + m.qty,
+        value: existing.value + getMovementValue(p, m),
+      })
     }
     return Array.from(counts.entries())
-      .map(([productId, qty]) => ({
+      .map(([productId, movement]) => ({
         product: products.find((p) => p.id === productId),
-        qty,
+        qty: movement.qty,
+        value: movement.value,
       }))
       .filter((x) => x.product)
-      .sort((a, b) => b.qty - a.qty)
+      .sort((a, b) => b.value - a.value)
       .slice(0, 6)
-  }, [movements, products])
+  }, [movements, now, products])
 
-  const topMoverMax = Math.max(...topMovers.map((m) => m.qty), 1)
+  const topMoverMax = Math.max(...topMovers.map((m) => m.value), 1)
 
   const stops = (() => {
     if (categoryBreakdown.length === 0) return ''
@@ -114,7 +127,7 @@ export default function InventoryDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Stock Value', value: `€${stats.totalValue.toFixed(2)}`, icon: Euro, color: 'text-accent-amber' },
-          { label: 'Total Units', value: stats.totalUnits.toString(), icon: Package, color: 'text-accent-blue' },
+          { label: 'Stocked SKUs', value: stats.stockedSkus.toString(), icon: Package, color: 'text-accent-blue' },
           { label: 'SKUs', value: stats.skus.toString(), icon: TrendingUp, color: 'text-accent-green' },
           { label: 'Low / Out', value: `${stats.lowStock} / ${stats.outOfStock}`, icon: AlertTriangle, color: stats.outOfStock > 0 ? 'text-red-400' : 'text-accent-amber' },
         ].map((kpi) => (
@@ -176,10 +189,10 @@ export default function InventoryDashboard() {
                   <div className="flex-1 bg-bg-tertiary rounded-sm h-5 relative overflow-hidden">
                     <div
                       className="h-full bg-accent-amber/60 rounded-sm"
-                      style={{ width: `${(m.qty / topMoverMax) * 100}%` }}
+                      style={{ width: `${(m.value / topMoverMax) * 100}%` }}
                     />
                     <span className="absolute inset-0 flex items-center px-2 font-mono text-[10px] text-text-primary">
-                      {m.qty}
+                      {formatStockQty(m.product!, m.qty)}
                     </span>
                   </div>
                 </div>
@@ -218,9 +231,9 @@ export default function InventoryDashboard() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`font-mono text-sm font-bold ${item.status === 'OUT' ? 'text-red-400' : 'text-accent-amber'}`}>
-                      {item.qty}
+                      {formatStockQty(item.product, item.qty)}
                     </p>
-                    <p className="text-[10px] text-text-muted font-mono">min {item.product.reorderLevel}</p>
+                    <p className="text-[10px] text-text-muted font-mono">min {formatStockQty(item.product, item.product.reorderLevel)}</p>
                   </div>
                 </div>
               ))}
@@ -261,7 +274,7 @@ export default function InventoryDashboard() {
                     <span className={`font-mono text-xs font-bold ${
                       m.type === 'IN' ? 'text-accent-green' : m.type === 'OUT' ? 'text-red-400' : 'text-accent-amber'
                     }`}>
-                      {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : '±'}{Math.abs(m.qty)}
+                      {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : '±'}{p ? formatStockQty(p, Math.abs(m.qty)) : Math.abs(m.qty)}
                     </span>
                   </div>
                 )

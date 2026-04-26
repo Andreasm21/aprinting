@@ -1,6 +1,6 @@
 import { Plus, Trash2, Lock } from 'lucide-react'
 import type { InvoiceLineItem } from '@/stores/invoicesStore'
-import { useInventoryStore } from '@/stores/inventoryStore'
+import { getUnitWeightGrams, isFilamentCategory, useInventoryStore } from '@/stores/inventoryStore'
 import { useContentStore } from '@/stores/contentStore'
 
 interface Props {
@@ -8,8 +8,6 @@ interface Props {
   onChange: (items: InvoiceLineItem[]) => void
   showMaterialFields?: boolean
 }
-
-const MATERIAL_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 
 export default function LineItemsEditor({ items, onChange, showMaterialFields = false }: Props) {
   const inventoryProducts = useInventoryStore((s) => s.products)
@@ -19,9 +17,9 @@ export default function LineItemsEditor({ items, onChange, showMaterialFields = 
 
   // Build material list from inventory: only material spools (not Hardware/Finished)
   const materials = inventoryProducts
-    .filter((p) => !p.archived && MATERIAL_CATEGORIES.includes(p.category))
+    .filter((p) => !p.archived && isFilamentCategory(p.category))
     .map((p) => {
-      const unitWeight = p.unitWeightGrams || 1000
+      const unitWeight = getUnitWeightGrams(p)
       const ratePerGram = unitWeight > 0 ? p.cost / unitWeight : 0
       const label = `${p.brand ? p.brand + ' ' : ''}${p.category}${p.name && p.name !== p.partNumber ? ' · ' + p.name.slice(0, 25) : ''}`
       return {

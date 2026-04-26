@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { ScanLine, Check, X, ArrowDownLeft, ArrowUpRight, RotateCcw, Minus, Plus, Camera, CameraOff } from 'lucide-react'
-import { useInventoryStore, type MovementType, type InventoryProduct } from '@/stores/inventoryStore'
+import {
+  displayQtyToStorage,
+  formatStockQty,
+  getStockUnitCost,
+  getStockUnitLabel,
+  useInventoryStore,
+  type InventoryProduct,
+  type MovementType,
+} from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 
 export default function InventoryScan() {
@@ -45,14 +53,15 @@ export default function InventoryScan() {
 
   const handleCommit = () => {
     if (!product) return
+    const storageQty = displayQtyToStorage(product.category, Math.abs(qty))
     addMovement({
       productId: product.id,
       type,
-      qty: Math.abs(qty),
-      unitCost: product.cost,
+      qty: type === 'ADJUST' && qty < 0 ? -storageQty : storageQty,
+      unitCost: getStockUnitCost(product),
       reference: `SCAN-${Date.now().toString().slice(-4)}`,
     })
-    setToast(`[ ${type === 'IN' ? 'STOCK IN' : type === 'OUT' ? 'STOCK OUT' : 'ADJUSTED'} · ${qty} ${type === 'OUT' ? 'UNITS REMOVED' : type === 'IN' ? 'UNITS LOGGED' : 'DELTA'} ]`)
+    setToast(`[ ${type === 'IN' ? 'STOCK IN' : type === 'OUT' ? 'STOCK OUT' : 'ADJUSTED'} · ${qty} ${getStockUnitLabel(product)} ${type === 'OUT' ? 'REMOVED' : type === 'IN' ? 'LOGGED' : 'DELTA'} ]`)
     setTimeout(() => setToast(''), 2500)
     setProduct(null)
     setQty(1)
@@ -65,7 +74,9 @@ export default function InventoryScan() {
       if (scannerRef.current) {
         try {
           await scannerRef.current.stop()
-        } catch {}
+        } catch (err) {
+          console.warn('[scan] camera stop error:', err)
+        }
         scannerRef.current = null
       }
       setCameraActive(false)
@@ -106,6 +117,8 @@ export default function InventoryScan() {
   }, [])
 
   const currentQty = product ? getQtyOnHand(product.id) : 0
+  const qtyUnit = product ? getStockUnitLabel(product) : 'pcs'
+  const qtyStep = qtyUnit === 'kg' ? 0.1 : 1
   const typeOptions = [
     { value: 'IN' as const, icon: ArrowDownLeft, color: 'border-accent-green text-accent-green bg-accent-green/10' },
     { value: 'OUT' as const, icon: ArrowUpRight, color: 'border-red-400 text-red-400 bg-red-400/10' },
@@ -188,7 +201,7 @@ export default function InventoryScan() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-mono text-text-muted uppercase">Current Qty</p>
-                  <p className="font-mono text-2xl font-bold text-accent-amber">{currentQty}</p>
+                  <p className="font-mono text-2xl font-bold text-accent-amber">{product ? formatStockQty(product, currentQty) : currentQty}</p>
                 </div>
               </div>
             </div>
@@ -215,24 +228,25 @@ export default function InventoryScan() {
 
             {/* Quantity stepper */}
             <div className="mb-5">
-              <label className="block font-mono text-xs text-text-muted uppercase mb-2 tracking-wider">Quantity</label>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-2 tracking-wider">Quantity ({qtyUnit})</label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setQty(type === 'ADJUST' ? qty - 1 : Math.max(1, qty - 1))}
+                  onClick={() => setQty(type === 'ADJUST' ? qty - qtyStep : Math.max(qtyStep, qty - qtyStep))}
                   className="w-14 h-14 rounded-lg border border-border hover:border-accent-amber flex items-center justify-center text-text-muted hover:text-accent-amber"
                 >
                   <Minus size={22} />
                 </button>
                 <input
                   type="number"
+                  step={qtyStep}
                   value={qty}
-                  onChange={(e) => setQty(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setQty(parseFloat(e.target.value) || 0)}
                   className="input-field text-center text-2xl font-mono font-bold flex-1 h-14"
                 />
                 <button
                   type="button"
-                  onClick={() => setQty(qty + 1)}
+                  onClick={() => setQty(qty + qtyStep)}
                   className="w-14 h-14 rounded-lg border border-border hover:border-accent-amber flex items-center justify-center text-text-muted hover:text-accent-amber"
                 >
                   <Plus size={22} />
@@ -246,7 +260,7 @@ export default function InventoryScan() {
               disabled={qty === 0}
               className={`${confirmColor} w-full font-mono text-base font-bold py-4 rounded-lg transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
             >
-              <Check size={18} /> Confirm {type} · {qty}
+              <Check size={18} /> Confirm {type} · {qty} {qtyUnit}
             </button>
           </div>
         )}

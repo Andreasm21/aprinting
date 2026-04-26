@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Plus, ArrowDownLeft, ArrowUpRight, RotateCcw, ArrowLeftRight } from 'lucide-react'
-import { useInventoryStore, type MovementType } from '@/stores/inventoryStore'
+import { formatStockQty, getMovementValue, useInventoryStore, type MovementType } from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 import NewMovementModal from './NewMovementModal'
 
@@ -83,7 +83,7 @@ export default function InventoryMovements() {
             <tbody>
               {filtered.map((m) => {
                 const p = products.find((x) => x.id === m.productId)
-                const value = m.qty * m.unitCost
+                const value = getMovementValue(p, m)
                 const Icon = m.type === 'IN' ? ArrowDownLeft : m.type === 'OUT' ? ArrowUpRight : RotateCcw
                 const color = m.type === 'IN' ? 'text-accent-green bg-accent-green/10 border-accent-green/30' : m.type === 'OUT' ? 'text-red-400 bg-red-400/10 border-red-400/30' : 'text-accent-amber bg-accent-amber/10 border-accent-amber/30'
                 return (
@@ -98,7 +98,7 @@ export default function InventoryMovements() {
                     <td className={`p-3 text-right font-mono text-sm font-bold ${
                       m.type === 'IN' ? 'text-accent-green' : m.type === 'OUT' ? 'text-red-400' : 'text-accent-amber'
                     }`}>
-                      {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : '±'}{Math.abs(m.qty)}
+                      {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : '±'}{p ? formatStockQty(p, Math.abs(m.qty)) : Math.abs(m.qty)}
                     </td>
                     <td className="p-3 text-right font-mono text-xs text-text-secondary hidden lg:table-cell">€{value.toFixed(2)}</td>
                     <td className="p-3 font-mono text-[11px] text-text-muted whitespace-nowrap">{formatDateTime(m.createdAt)}</td>

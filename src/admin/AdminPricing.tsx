@@ -1,9 +1,14 @@
 import { Calculator, Zap, Wrench, TrendingUp, Settings2, AlertTriangle, Info } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
-import { useInventoryStore } from '@/stores/inventoryStore'
+import { getUnitWeightGrams, isFilamentCategory, useInventoryStore } from '@/stores/inventoryStore'
 import { useMemo } from 'react'
 
-const FILAMENT_CATS = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
+const EXAMPLE_JOB = {
+  weightG: 500,
+  pricePerKg: 23.99,
+  printH: 33,
+  labourH: 1,
+}
 
 export default function AdminPricing() {
   const { content, updateContent } = useContentStore()
@@ -13,25 +18,18 @@ export default function AdminPricing() {
   // Sample numbers used for the live example below the formula. Same
   // values as in the reference spreadsheet so admin can sanity-check
   // any rate change against a known result.
-  const example = {
-    weightG: 500,
-    pricePerKg: 23.99,
-    printH: 33,
-    labourH: 1,
-  }
+  const example = EXAMPLE_JOB
 
-  const calc = useMemo(() => {
-    const material = (example.weightG / 1000) * example.pricePerKg
-    const electricity = example.printH * pp.defaultPowerDraw * pp.electricityRate
-    const labour = example.labourH * pp.labourRate
-    const depreciation = example.printH * pp.depreciationRate
-    const cogs = material + electricity + labour + depreciation
-    const sell = cogs * (1 + pp.profitMarkup / 100)
-    return { material, electricity, labour, depreciation, cogs, sell }
-  }, [pp])
+  const material = (example.weightG / 1000) * example.pricePerKg
+  const electricity = example.printH * pp.defaultPowerDraw * pp.electricityRate
+  const labour = example.labourH * pp.labourRate
+  const depreciation = example.printH * pp.depreciationRate
+  const cogs = material + electricity + labour + depreciation
+  const sell = cogs * (1 + pp.profitMarkup / 100)
+  const calc = { material, electricity, labour, depreciation, cogs, sell }
 
   const filamentItems = useMemo(
-    () => inventoryProducts.filter((p) => !p.archived && FILAMENT_CATS.includes(p.category)),
+    () => inventoryProducts.filter((p) => !p.archived && isFilamentCategory(p.category)),
     [inventoryProducts],
   )
 
@@ -189,7 +187,7 @@ export default function AdminPricing() {
               <p className="text-text-muted text-xs mb-3">These are calculated from each spool's cost and unit weight in the Inventory page. Edit costs there — they flow into every quote automatically.</p>
               <div className="space-y-1">
                 {filamentItems.map((p) => {
-                  const unit = p.unitWeightGrams || 1000
+                  const unit = getUnitWeightGrams(p)
                   const perKg = p.cost * (1000 / unit)
                   const perG = unit > 0 ? p.cost / unit : 0
                   return (

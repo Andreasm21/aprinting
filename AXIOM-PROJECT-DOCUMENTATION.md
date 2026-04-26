@@ -564,13 +564,13 @@ Description     Material         Weight  Print h  Labour h  Unit €  Qty  Total
 - 13 categories: PLA / PETG / ABS / TPU / Resin / Nylon / Tools / Spare Parts / Consumables / Equipment / Packaging / Hardware / Finished
 
 **`InventoryProductFormModal.tsx`** ⭐ — Add or Edit:
-- Fields: Name *, Brand, Supplier, Category *, Cost per kg *, Bin Location, Barcode
+- Fields: Name *, Brand, Supplier, Category *, Cost per kg/unit *, Low-stock threshold, Bin Location, Barcode
 - **Add to stock** field (always shown, both add and edit modes):
   - For filaments: input in **kg** (multiplied by 1000 → stored as grams)
   - For non-filaments: input in **pieces**
   - When editing, shows current on-hand qty for context
   - Default `0` in edit mode (no accidental double-add)
-  - Live preview: *"After save → on hand will be X g"*
+  - Live preview: *"After save → on hand will be X kg/pcs"*
 - Auto-generates partNumber as `{BRAND}-{CATEGORY}-{RAND}` (e.g. `CREA-ABS-7K3X`) on first save
 
 **`InventoryQueue.tsx`** ⭐ (Print Job Manager):
@@ -852,7 +852,7 @@ Price:        €43.7411 ✓
 - **Inputs** in `LineItemsEditor` per row (weight, print h, labour h, material picker)
 - **Calculation** in `LineItemsEditor.calcUnitPrice()` runs on every input change
 - **Rates** read from `useContentStore.content.printPricing`
-- **Material rate** derived from `inventory.cost / inventory.unitWeightGrams`
+- **Material rate** derived from `inventory.cost / inventory.unitWeightGrams` for filament, while unit-count products use `inventory.cost` per piece
 - **Override**: admin can manually edit Unit Price OR set a quotation-level Total Override that scales line items proportionally
 
 ---
@@ -928,8 +928,10 @@ The **Off-the-Shelf / Pre-Made** route skips Request and Quotation:
 
 ### Unit conventions
 
-- **Filaments** (PLA/PETG/ABS/TPU/Resin/Nylon): tracked in **grams** (matches `consumeMaterial`'s deduction unit). UI shows kg in the form, multiplies by 1000 internally.
-- **Everything else**: tracked in **pieces**.
+- **Filaments** (PLA/PETG/ABS/TPU/Resin/Nylon): stored in `stock_movements.qty` as **grams** because accepted quotes deduct printed weight. Admin forms, stock tables, scan, movements, reports, and low-stock alerts display **kg**.
+- **Filament cost**: stored on `inventory_products.cost` as **€/kg**. Movement valuation uses **€/g** (`cost / unitWeightGrams`) so 1 kg at €23.99 is valued as €23.99, not €23,990.
+- **Everything else**: stored, displayed, and valued as **pieces** with **€/unit**.
+- Shared helpers in `inventoryStore.ts` (`formatStockQty`, `displayQtyToStorage`, `getStockUnitCost`, `getStockLineValue`, `getMovementValue`) are the canonical conversion layer. Avoid displaying raw movement `qty` directly for filament.
 
 ### Low-stock alert email
 
@@ -939,8 +941,8 @@ Themed dark/amber template (`lowStockAlertEmail` in `emailTemplates.ts`):
 [LOW STOCK] CREA-ABS-1OUO — Creality ABS BLACK
 ─────────────────────────────────────
 Part #            Item                 On hand
-CREA-ABS-1OUO    Creality ABS BLACK    180 g
-                 ABS                   threshold 200 g
+CREA-ABS-1OUO    Creality ABS BLACK    0.18 kg
+                 ABS                   threshold 0.2 kg
 ─────────────────────────────────────
 [Open Inventory] CTA → /admin/inventory/products
 ```
@@ -1354,12 +1356,12 @@ dist/assets/index-XXXXXX.js  ~1.4 MB raw / ~390 KB gzipped
 
 ### Workflow D: Inventory low stock
 
-1. Customer accepts a quote that uses 500g of Creality ABS BLACK (currently 680g in stock, threshold 200g)
-2. `consumeMaterial()` records OUT 500g → on-hand drops to 180g (crossed threshold)
+1. Customer accepts a quote that uses 500g of Creality ABS BLACK (currently 0.68kg in stock, threshold 0.2kg)
+2. `consumeMaterial()` records OUT 500g → on-hand drops to 0.18kg (crossed threshold)
 3. Admin notification fires: *"[LOW STOCK] CREA-ABS-1OUO — Creality ABS BLACK"*
 4. Email sent to all admin users + `team@axiomcreate.com` with item details + threshold + Open Inventory button
-5. Admin opens Inventory → finds the product → clicks **Edit** → enters `1` in **Add to stock** field (= 1 kg = 1000g IN movement)
-6. New on-hand: 180g + 1000g = 1180g (above threshold again)
+5. Admin opens Inventory → finds the product → clicks **Edit** → enters `1` in **Add to stock** field (= 1 kg = 1000g IN movement internally)
+6. New on-hand: 0.18kg + 1kg = 1.18kg (above threshold again)
 
 ### Workflow E: Track an existing order without a portal account
 

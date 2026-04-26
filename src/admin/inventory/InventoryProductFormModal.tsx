@@ -2,9 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Check, Package, Plus } from 'lucide-react'
 import {
   CATEGORIES,
-  FILAMENT_CATEGORIES,
+  displayQtyToStorage,
+  formatStockQty,
   getCustomCategories,
+  getStockUnitLabel,
   saveCustomCategory,
+  storageQtyToDisplay,
   useInventoryStore,
   type InventoryProduct,
   type InventoryCategory,
@@ -25,6 +28,7 @@ interface FormData {
   // For EDIT mode: extra stock to add now (logged as a fresh IN movement).
   // Units: kg for filaments, pieces for everything else.
   qtyToAdd: number
+  reorderLevel: number
 }
 
 // Generate a unique part number from brand + category + 4 random chars
@@ -35,12 +39,8 @@ function generatePartNumber(brand: string, category: string): string {
   return `${prefix}-${cat}-${rand}`
 }
 
-function isFilament(category: string): boolean {
-  return (FILAMENT_CATEGORIES as readonly string[]).includes(category)
-}
-
 function defaultPricingMode(category: string): PricingMode {
-  return isFilament(category) ? 'per_kg' : 'per_unit'
+  return getStockUnitLabel(category) === 'kg' ? 'per_kg' : 'per_unit'
 }
 
 const ADD_NEW_VALUE = '__add_new__'
@@ -63,16 +63,12 @@ export default function InventoryProductFormModal({
   const [newCategoryName, setNewCategoryName] = useState('')
   const newCategoryInputRef = useRef<HTMLInputElement>(null)
 
-  // Determine initial pricing mode
   const initialCategory = initial?.category || 'PLA'
-  const initialMode: PricingMode =
-    initial && initial.unitWeightGrams && initial.unitWeightGrams > 0 ? 'per_kg' : 'per_unit'
-
-  // Convert existing item's per-spool cost back to per-kg for editing
-  const initialCost =
-    initial && initial.unitWeightGrams && initial.unitWeightGrams > 0
-      ? (initial.cost * 1000) / initial.unitWeightGrams
-      : initial?.cost ?? 0
+  const initialMode = defaultPricingMode(initialCategory)
+  const initialCost = initial?.cost ?? 0
+  const initialReorderLevel = initial
+    ? storageQtyToDisplay(initial, initial.reorderLevel)
+    : getStockUnitLabel(initialCategory) === 'kg' ? 0.2 : 5
 
   const [form, setForm] = useState<FormData>({
     name: initial?.name || '',
@@ -85,6 +81,7 @@ export default function InventoryProductFormModal({
     barcode: initial?.barcode || '',
     // Default: 1 (kg or piece) for new items, 0 for edits (don't accidentally add).
     qtyToAdd: initial ? 0 : 1,
+    reorderLevel: initialReorderLevel,
   })
 
   useEffect(() => {
@@ -104,6 +101,7 @@ export default function InventoryProductFormModal({
       ...f,
       category: value,
       pricingMode: defaultPricingMode(value),
+      reorderLevel: getStockUnitLabel(value) === 'kg' ? 0.2 : 5,
     }))
   }
 
@@ -121,6 +119,7 @@ export default function InventoryProductFormModal({
       ...f,
       category: trimmed,
       pricingMode: 'per_unit',
+      reorderLevel: 5,
     }))
     setAddingCategory(false)
     setNewCategoryName('')
@@ -129,21 +128,18 @@ export default function InventoryProductFormModal({
   // Show the current on-hand qty when editing so admin knows what's there.
   const currentQty = useInventoryStore((s) => initial ? s.getQtyOnHand(initial.id) : 0)
 
-  const isFilamentCat = isFilament(form.category)
-  const inputUnit = isFilamentCat ? 'kg' : 'pcs'
-  const storageUnit = isFilamentCat ? 'g' : 'pcs'
-  const currentDisplayUnit = isFilamentCat ? 'g' : 'pcs'
+  const isKgMode = getStockUnitLabel(form.category) === 'kg'
+  const inputUnit = getStockUnitLabel(form.category)
+  const productForDisplay = {
+    category: form.category as InventoryCategory,
+    unitWeightGrams: isKgMode ? 1000 : undefined,
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    const isKg = form.pricingMode === 'per_kg'
-    // Convert input qty to STORAGE units. Stock movements for filaments are
-    // tracked in grams (because consumeMaterial deducts grams). Non-filaments
-    // stay in pieces.
-    const qtyInStorageUnits = isFilamentCat
-      ? Number(form.qtyToAdd) * 1000   // 1 kg → 1000 g
-      : Number(form.qtyToAdd) || 0
+    const qtyInStorageUnits = displayQtyToStorage(form.category, Number(form.qtyToAdd) || 0)
+    const reorderLevelInStorageUnits = displayQtyToStorage(form.category, Number(form.reorderLevel) || 0)
 
     onSave(
       {
@@ -153,18 +149,16 @@ export default function InventoryProductFormModal({
         brand: form.brand.trim() || undefined,
         cost: Number(form.cost),
         price: Number(form.cost),
-        reorderLevel: initial?.reorderLevel ?? 5,
+        reorderLevel: reorderLevelInStorageUnits,
         bin: form.bin.trim() || undefined,
         barcode: form.barcode.trim() || undefined,
         supplier: form.supplier.trim() || undefined,
-        unitWeightGrams: isKg ? 1000 : undefined,
+        unitWeightGrams: isKgMode ? 1000 : undefined,
         archived: initial?.archived || false,
       },
       qtyInStorageUnits > 0 ? qtyInStorageUnits : undefined,
     )
   }
-
-  const isKgMode = form.pricingMode === 'per_kg'
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
@@ -255,7 +249,7 @@ export default function InventoryProductFormModal({
                   <option value={ADD_NEW_VALUE}>+ Add new category…</option>
                 </select>
               )}
-              {!addingCategory && isFilament(form.category) && (
+              {!addingCategory && isKgMode && (
                 <p className="text-[10px] text-accent-cyan font-mono mt-1">Filament — priced per kg</p>
               )}
             </div>
@@ -266,31 +260,16 @@ export default function InventoryProductFormModal({
                 <label className="font-mono text-xs text-text-muted uppercase">
                   {isKgMode ? 'Cost per kg (€)' : 'Cost per unit (€)'} *
                 </label>
-                {/* Only show toggle for non-filament categories */}
-                {!isFilament(form.category) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        pricingMode: f.pricingMode === 'per_kg' ? 'per_unit' : 'per_kg',
-                      }))
-                    }
-                    className="text-[10px] font-mono text-accent-amber hover:underline leading-none"
-                  >
-                    {isKgMode ? '→ unit' : '→ /kg'}
-                  </button>
-                )}
               </div>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm font-mono">€</span>
                 <input
                   type="number"
-                  step={isKgMode ? '0.01' : '1'}
+                  step="0.01"
                   min={0}
                   value={form.cost}
                   onChange={(e) =>
-                    setForm({ ...form, cost: isKgMode ? parseFloat(e.target.value) || 0 : parseInt(e.target.value) || 0 })
+                    setForm({ ...form, cost: parseFloat(e.target.value) || 0 })
                   }
                   className="input-field text-sm font-mono pl-7"
                   required
@@ -306,6 +285,26 @@ export default function InventoryProductFormModal({
                 <p className="text-[10px] text-text-muted font-mono mt-1">Price per item / piece</p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label className="block font-mono text-xs text-text-muted uppercase mb-1">
+              Low-stock threshold ({inputUnit})
+            </label>
+            <div className="relative max-w-[220px]">
+              <input
+                type="number"
+                min={0}
+                step={isKgMode ? '0.05' : '1'}
+                value={form.reorderLevel}
+                onChange={(e) => setForm({ ...form, reorderLevel: parseFloat(e.target.value) || 0 })}
+                className="input-field text-sm font-mono pr-12"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs font-mono uppercase">{inputUnit}</span>
+            </div>
+            <p className="text-[10px] text-text-muted font-mono mt-1">
+              Alerts use this unit. Filament thresholds are stored as grams internally.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -338,7 +337,7 @@ export default function InventoryProductFormModal({
               </label>
               {initial && (
                 <span className="text-[10px] font-mono text-text-muted">
-                  Currently on hand: <span className="text-text-primary font-bold">{currentQty.toFixed(0)} {currentDisplayUnit}</span>
+                  Currently on hand: <span className="text-text-primary font-bold">{formatStockQty(initial, currentQty)}</span>
                 </span>
               )}
             </div>
@@ -347,17 +346,17 @@ export default function InventoryProductFormModal({
                 <input
                   type="number"
                   min={0}
-                  step={isFilamentCat ? '0.1' : '1'}
+                  step={isKgMode ? '0.1' : '1'}
                   value={form.qtyToAdd}
                   onChange={(e) => setForm({ ...form, qtyToAdd: parseFloat(e.target.value) || 0 })}
                   className="input-field text-sm font-mono pr-12"
-                  placeholder={isFilamentCat ? '1' : '10'}
+                  placeholder={isKgMode ? '1' : '10'}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs font-mono uppercase">{inputUnit}</span>
               </div>
               {initial && form.qtyToAdd > 0 && (
                 <span className="text-[11px] font-mono text-accent-green flex items-center gap-1 whitespace-nowrap">
-                  <Plus size={11} /> {(isFilamentCat ? form.qtyToAdd * 1000 : form.qtyToAdd).toFixed(0)} {storageUnit}
+                  <Plus size={11} /> {formatStockQty(productForDisplay, displayQtyToStorage(form.category, form.qtyToAdd))}
                 </span>
               )}
             </div>
@@ -365,11 +364,11 @@ export default function InventoryProductFormModal({
               {initial
                 ? `Adds an IN movement for the new stock — leave at 0 if you're only editing other fields.`
                 : `Initial stock to seed when the product is created.`}
-              {isFilamentCat && ' Filament is tracked in grams internally; enter kg here.'}
+              {isKgMode && ' Filament is tracked in grams internally; enter kg here.'}
             </p>
             {initial && form.qtyToAdd > 0 && (
               <p className="text-[10px] text-accent-amber font-mono">
-                After save → on hand will be {(currentQty + (isFilamentCat ? form.qtyToAdd * 1000 : form.qtyToAdd)).toFixed(0)} {storageUnit}
+                After save → on hand will be {formatStockQty(productForDisplay, currentQty + displayQtyToStorage(form.category, form.qtyToAdd))}
               </p>
             )}
           </div>

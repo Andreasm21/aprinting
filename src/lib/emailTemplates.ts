@@ -259,7 +259,7 @@ export function lowStockAlertEmail(opts: {
     partNumber: string
     name: string
     category: string
-    qtyOnHand: number       // current units (grams for filaments)
+    qtyOnHand: number       // display units (kg for filaments, pcs otherwise)
     threshold: number       // the level we crossed under
     unit?: string           // e.g. 'g' for filaments, 'pcs' otherwise
   }>

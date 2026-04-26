@@ -1,6 +1,13 @@
 import { useState, useMemo } from 'react'
 import { X, Check, ArrowDownLeft, ArrowUpRight, RotateCcw, Minus, Plus, Search } from 'lucide-react'
-import { useInventoryStore, type MovementType, type InventoryProduct } from '@/stores/inventoryStore'
+import {
+  displayQtyToStorage,
+  getStockUnitCost,
+  getStockUnitLabel,
+  useInventoryStore,
+  type InventoryProduct,
+  type MovementType,
+} from '@/stores/inventoryStore'
 
 export default function NewMovementModal({
   presetProduct,
@@ -30,11 +37,12 @@ export default function NewMovementModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!product) return
+    const storageQty = displayQtyToStorage(product.category, Math.abs(qty))
     addMovement({
       productId: product.id,
       type,
-      qty: type === 'ADJUST' ? qty : Math.abs(qty),
-      unitCost: product.cost,
+      qty: type === 'ADJUST' && qty < 0 ? -storageQty : storageQty,
+      unitCost: getStockUnitCost(product),
       reference: reference.trim() || undefined,
       notes: notes.trim() || undefined,
     })
@@ -48,6 +56,8 @@ export default function NewMovementModal({
   ]
 
   const confirmColor = type === 'IN' ? 'bg-accent-green text-bg-primary' : type === 'OUT' ? 'bg-red-400 text-bg-primary' : 'bg-accent-amber text-bg-primary'
+  const qtyUnit = product ? getStockUnitLabel(product) : 'pcs'
+  const qtyStep = qtyUnit === 'kg' ? 0.1 : 1
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
@@ -125,25 +135,26 @@ export default function NewMovementModal({
           {/* Quantity stepper */}
           <div>
             <label className="block font-mono text-xs text-text-muted uppercase mb-2">
-              Quantity {type === 'ADJUST' && <span className="text-text-muted">(+/- delta)</span>}
+              Quantity ({qtyUnit}) {type === 'ADJUST' && <span className="text-text-muted">(+/- delta)</span>}
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setQty(type === 'ADJUST' ? qty - 1 : Math.max(1, qty - 1))}
+                onClick={() => setQty(type === 'ADJUST' ? qty - qtyStep : Math.max(qtyStep, qty - qtyStep))}
                 className="w-12 h-12 rounded-lg border border-border hover:border-accent-amber flex items-center justify-center text-text-muted hover:text-accent-amber transition-all"
               >
                 <Minus size={20} />
               </button>
               <input
                 type="number"
+                step={qtyStep}
                 value={qty}
-                onChange={(e) => setQty(parseInt(e.target.value) || 0)}
+                onChange={(e) => setQty(parseFloat(e.target.value) || 0)}
                 className="input-field text-center text-lg font-mono font-bold flex-1 h-12"
               />
               <button
                 type="button"
-                onClick={() => setQty(qty + 1)}
+                onClick={() => setQty(qty + qtyStep)}
                 className="w-12 h-12 rounded-lg border border-border hover:border-accent-amber flex items-center justify-center text-text-muted hover:text-accent-amber transition-all"
               >
                 <Plus size={20} />

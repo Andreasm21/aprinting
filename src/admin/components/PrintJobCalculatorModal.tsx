@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { X, Calculator, Plus, Zap, User, Wrench, Coins } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
-import { useInventoryStore } from '@/stores/inventoryStore'
+import { getUnitWeightGrams, isFilamentCategory, useInventoryStore } from '@/stores/inventoryStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 
 interface MaterialOption {
@@ -9,8 +9,6 @@ interface MaterialOption {
   name: string
   pricePerKg: number
 }
-
-const MATERIAL_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 
 export default function PrintJobCalculatorModal({ onClose }: { onClose: () => void }) {
   const pp = useContentStore((s) => s.content.printPricing)
@@ -20,9 +18,9 @@ export default function PrintJobCalculatorModal({ onClose }: { onClose: () => vo
   // Build material options from real inventory (filament spools)
   const materials: MaterialOption[] = useMemo(() => {
     return inventoryProducts
-      .filter((p) => !p.archived && MATERIAL_CATEGORIES.includes(p.category))
+      .filter((p) => !p.archived && isFilamentCategory(p.category))
       .map((p) => {
-        const unitWeight = p.unitWeightGrams || 1000
+        const unitWeight = getUnitWeightGrams(p)
         const pricePerKg = p.cost * (1000 / unitWeight)
         return {
           group: p.category,

@@ -24,6 +24,7 @@ export type InventoryCategory =
   | string          // user-defined custom categories
 
 export const FILAMENT_CATEGORIES = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'] as const
+const DEFAULT_FILAMENT_UNIT_GRAMS = 1000
 
 export const CATEGORIES: string[] = [
   'PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon',
@@ -47,6 +48,79 @@ export function saveCustomCategory(name: string): void {
   if (!existing.includes(name)) {
     localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify([...existing, name]))
   }
+}
+
+export function isFilamentCategory(category: string): boolean {
+  return (FILAMENT_CATEGORIES as readonly string[]).includes(category)
+}
+
+export function getUnitWeightGrams(product: Pick<InventoryProduct, 'category' | 'unitWeightGrams'>): number {
+  if (!isFilamentCategory(product.category)) return 1
+  return product.unitWeightGrams && product.unitWeightGrams > 0
+    ? product.unitWeightGrams
+    : DEFAULT_FILAMENT_UNIT_GRAMS
+}
+
+export function storageQtyToDisplay(
+  product: Pick<InventoryProduct, 'category' | 'unitWeightGrams'>,
+  qty: number,
+): number {
+  return isFilamentCategory(product.category) ? qty / getUnitWeightGrams(product) : qty
+}
+
+export function displayQtyToStorage(category: string, qty: number): number {
+  return isFilamentCategory(category) ? qty * DEFAULT_FILAMENT_UNIT_GRAMS : qty
+}
+
+export function getStockUnitLabel(productOrCategory: Pick<InventoryProduct, 'category'> | string): 'kg' | 'pcs' {
+  const category = typeof productOrCategory === 'string' ? productOrCategory : productOrCategory.category
+  return isFilamentCategory(category) ? 'kg' : 'pcs'
+}
+
+export function getStorageUnitLabel(productOrCategory: Pick<InventoryProduct, 'category'> | string): 'g' | 'pcs' {
+  const category = typeof productOrCategory === 'string' ? productOrCategory : productOrCategory.category
+  return isFilamentCategory(category) ? 'g' : 'pcs'
+}
+
+export function formatStockQty(
+  product: Pick<InventoryProduct, 'category' | 'unitWeightGrams'>,
+  qty: number,
+): string {
+  const displayQty = storageQtyToDisplay(product, qty)
+  if (isFilamentCategory(product.category)) {
+    return `${displayQty.toLocaleString('en-GB', { maximumFractionDigits: 3 })} kg`
+  }
+  return `${displayQty.toLocaleString('en-GB', { maximumFractionDigits: 0 })} pcs`
+}
+
+export function getStockUnitCost(
+  product: Pick<InventoryProduct, 'category' | 'cost' | 'unitWeightGrams'>,
+): number {
+  return isFilamentCategory(product.category) ? product.cost / getUnitWeightGrams(product) : product.cost
+}
+
+export function getStockLineValue(
+  product: Pick<InventoryProduct, 'category' | 'cost' | 'unitWeightGrams'>,
+  storageQty: number,
+): number {
+  return storageQty * getStockUnitCost(product)
+}
+
+export function getMovementValue(
+  product: Pick<InventoryProduct, 'category' | 'cost' | 'unitWeightGrams'> | undefined,
+  movement: Pick<StockMovement, 'qty' | 'unitCost'>,
+): number {
+  if (!product) return movement.qty * movement.unitCost
+  if (!isFilamentCategory(product.category)) return movement.qty * movement.unitCost
+
+  const correctUnitCost = getStockUnitCost(product)
+  // Older filament IN movements were sometimes saved as kg × €/kg while qty
+  // was already grams. If the movement unit cost is clearly not €/g, value it
+  // as kg-priced stock so reports do not explode by 1000x.
+  if (movement.unitCost > correctUnitCost * 10) {
+    return storageQtyToDisplay(product, movement.qty) * movement.unitCost
+  }
+  return movement.qty * movement.unitCost
 }
 
 export interface InventoryProduct {
@@ -161,7 +235,7 @@ function rowToProduct(r: SbProduct): InventoryProduct {
     bin: r.bin ?? undefined,
     barcode: r.barcode ?? undefined,
     supplier: r.supplier ?? undefined,
-    unitWeightGrams: r.unit_weight_grams != null ? Number(r.unit_weight_grams) : 1000,
+    unitWeightGrams: r.unit_weight_grams != null ? Number(r.unit_weight_grams) : undefined,
     archived: r.archived,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -331,7 +405,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
         useAuditLogStore.getState().log(
           'create',
           'product',
-          `Stock ${data.type}: ${data.qty} × ${p.partNumber}`,
+          `Stock ${data.type}: ${formatStockQty(p, data.qty)} × ${p.partNumber}`,
           data.reference || ''
         )
       }
@@ -348,9 +422,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
       const qtyBefore = get().getQtyOnHand(product.id)
       // unitCost recorded on the OUT movement = cost per gram so reports show
       // the COGS portion correctly.
-      const unitCost = (product.unitWeightGrams && product.unitWeightGrams > 0)
-        ? product.cost / product.unitWeightGrams
-        : 0
+      const unitCost = getStockUnitCost(product)
       get().addMovement({
         productId: product.id,
         type: 'OUT',
@@ -374,13 +446,12 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
       // Only fire when this movement CROSSED the threshold (was above, now
       // at-or-below). Avoids spamming alerts while stock is already low.
       if (qtyBefore > threshold && qtyAfter <= threshold) {
-        const isFilament = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'].includes(product.category)
-        const unit = isFilament ? 'g' : 'pcs'
+        const unit = getStockUnitLabel(product)
         // 1) In-app notification
         void useNotificationsStore.getState().addAdminAlert({
           kind: 'other',
           title: `[LOW STOCK] ${product.partNumber} — ${product.name}`,
-          message: `${qtyAfter.toFixed(0)} ${unit} left (threshold ${threshold.toFixed(0)} ${unit}). Time to reorder.`,
+          message: `${formatStockQty(product, qtyAfter)} left (threshold ${formatStockQty(product, threshold)}). Time to reorder.`,
           context: { customerName: product.name },
         })
         // 2) Email to admins
@@ -396,8 +467,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => {
             partNumber: product.partNumber,
             name: product.name,
             category: product.category,
-            qtyOnHand: qtyAfter,
-            threshold,
+            qtyOnHand: storageQtyToDisplay(product, qtyAfter),
+            threshold: storageQtyToDisplay(product, threshold),
             unit,
           }],
           inventoryUrl,

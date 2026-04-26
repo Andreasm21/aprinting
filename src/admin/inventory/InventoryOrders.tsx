@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Truck, Plus, ExternalLink, Package, CheckCircle2, Clock, X, Trash2, ChevronDown, ChevronUp, Boxes, Search, Edit3 } from 'lucide-react'
 import { usePurchaseOrdersStore, type PurchaseOrder, type POStatus, type POItem } from '@/stores/purchaseOrdersStore'
-import { useInventoryStore, CATEGORIES, type InventoryCategory } from '@/stores/inventoryStore'
+import { displayQtyToStorage, isFilamentCategory, useInventoryStore, CATEGORIES, type InventoryCategory } from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
@@ -90,9 +90,10 @@ export default function InventoryOrders() {
       brand: order.supplier,
       cost: item.unitCost,
       price: item.unitCost * 2, // default markup 2x
-      reorderLevel: Math.ceil(item.quantity / 4),
+      reorderLevel: isFilamentCategory(item.category) ? displayQtyToStorage(item.category, 0.2) : Math.ceil(item.quantity / 4),
       barcode: generateBarcode(),
       supplier: order.supplier,
+      unitWeightGrams: isFilamentCategory(item.category) ? 1000 : undefined,
       archived: false,
     })
     receiveItem(order.id, item.id, newId)

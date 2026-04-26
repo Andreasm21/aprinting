@@ -1,6 +1,16 @@
 import { useState, useMemo } from 'react'
 import { Plus, Search, Edit3, Trash2, Package, QrCode, FileText, X, AlertTriangle } from 'lucide-react'
-import { useInventoryStore, CATEGORIES, type InventoryProduct, type InventoryCategory, type StockStatus } from '@/stores/inventoryStore'
+import {
+  CATEGORIES,
+  formatStockQty,
+  getStockUnitCost,
+  getStockUnitLabel,
+  isFilamentCategory,
+  useInventoryStore,
+  type InventoryCategory,
+  type InventoryProduct,
+  type StockStatus,
+} from '@/stores/inventoryStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 import { useContentStore } from '@/stores/contentStore'
 import InventoryLayout from './InventoryLayout'
@@ -37,7 +47,7 @@ export default function InventoryProducts() {
   const handleQuote = (p: InventoryProduct) => {
     // For filament spools, the description should be just the filament kind (PLA, PETG, etc.)
     // — no brand. For Hardware/Finished items keep the descriptive name.
-    const isFilament = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon'].includes(p.category)
+    const isFilament = isFilamentCategory(p.category)
     const desc = isFilament ? p.category : `${p.partNumber} — ${p.name}`
     // Apply profit markup to inventory cost when adding to a quote.
     const priceWithMarkup = p.price * (1 + profitMarkup / 100)
@@ -189,7 +199,7 @@ export default function InventoryProducts() {
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Name</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Cat</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase hidden md:table-cell">Bin</th>
-                <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Qty</th>
+                <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">On Hand</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase hidden lg:table-cell">Cost</th>
                 <th className="text-center p-3 font-mono text-xs text-text-muted uppercase">Status</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Actions</th>
@@ -216,8 +226,10 @@ export default function InventoryProducts() {
                     </td>
                     <td className="p-3 font-mono text-[10px] uppercase text-text-muted">{p.category}</td>
                     <td className="p-3 font-mono text-xs text-text-secondary hidden md:table-cell">{p.bin || '—'}</td>
-                    <td className="p-3 text-right font-mono text-sm text-text-primary">{qty}</td>
-                    <td className="p-3 text-right font-mono text-xs text-text-secondary hidden lg:table-cell">€{p.cost.toFixed(2)}</td>
+                    <td className="p-3 text-right font-mono text-sm text-text-primary whitespace-nowrap">{formatStockQty(p, qty)}</td>
+                    <td className="p-3 text-right font-mono text-xs text-text-secondary hidden lg:table-cell">
+                      €{p.cost.toFixed(2)}/{getStockUnitLabel(p)}
+                    </td>
                     <td className="p-3 text-center">
                       <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${STATUS_STYLE[status]}`}>
                         {status}
@@ -277,7 +289,7 @@ export default function InventoryProducts() {
                 productId: id,
                 type: 'IN',
                 qty: initialQty,
-                unitCost: data.cost,
+                unitCost: getStockUnitCost(data),
                 notes: 'Initial stock',
               })
             }
@@ -299,7 +311,7 @@ export default function InventoryProducts() {
                 productId: editing.id,
                 type: 'IN',
                 qty: qtyToAdd,
-                unitCost: (data.unitWeightGrams && data.unitWeightGrams > 0) ? data.cost / data.unitWeightGrams : data.cost,
+                unitCost: getStockUnitCost(data),
                 notes: 'Manual restock from edit',
                 reference: 'restock',
               })

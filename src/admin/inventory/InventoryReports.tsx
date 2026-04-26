@@ -1,19 +1,19 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Download, Euro, TrendingUp, RefreshCw, Skull } from 'lucide-react'
-import { useInventoryStore } from '@/stores/inventoryStore'
+import { formatStockQty, getMovementValue, getStockLineValue, getStockUnitLabel, useInventoryStore } from '@/stores/inventoryStore'
 import InventoryLayout from './InventoryLayout'
 
-function daysSince(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+function daysSince(dateStr: string, now: number): number {
+  return Math.floor((now - new Date(dateStr).getTime()) / 86400000)
 }
 
 export default function InventoryReports() {
+  const [now] = useState(() => Date.now())
   const products = useInventoryStore((s) => s.products)
   const movements = useInventoryStore((s) => s.movements)
   const getQtyOnHand = useInventoryStore((s) => s.getQtyOnHand)
 
   const kpis = useMemo(() => {
-    const now = Date.now()
     const thirtyDaysAgo = now - 30 * 86400000
 
     // COGS last 30d = sum of (OUT movements qty * unit_cost)
@@ -21,11 +21,11 @@ export default function InventoryReports() {
     for (const m of movements) {
       if (m.type !== 'OUT') continue
       if (new Date(m.createdAt).getTime() < thirtyDaysAgo) continue
-      cogs30d += m.qty * m.unitCost
+      cogs30d += getMovementValue(products.find((p) => p.id === m.productId), m)
     }
 
     // Inventory value now
-    const invValue = products.reduce((s, p) => s + Math.max(0, getQtyOnHand(p.id)) * p.cost, 0)
+    const invValue = products.reduce((s, p) => s + getStockLineValue(p, Math.max(0, getQtyOnHand(p.id))), 0)
 
     // Turnover (annualized) = (COGS 30d * 12) / avg inventory
     const turnover = invValue > 0 ? (cogs30d * 12) / invValue : 0
@@ -34,7 +34,7 @@ export default function InventoryReports() {
     else if (turnover >= 2) health = 'MODERATE'
 
     return { cogs30d, invValue, turnover, health }
-  }, [products, movements, getQtyOnHand])
+  }, [products, movements, getQtyOnHand, now])
 
   const aging = useMemo(() => {
     // For each product, find the last OUT movement
@@ -50,8 +50,8 @@ export default function InventoryReports() {
       const qty = getQtyOnHand(p.id)
       if (qty <= 0) continue
       const lastOut = movements.find((m) => m.productId === p.id && m.type === 'OUT')
-      const days = lastOut ? daysSince(lastOut.createdAt) : daysSince(p.createdAt)
-      const value = qty * p.cost
+      const days = lastOut ? daysSince(lastOut.createdAt, now) : daysSince(p.createdAt, now)
+      const value = getStockLineValue(p, qty)
       for (const b of buckets) {
         if (days >= b.min && days <= b.max) {
           b.count++
@@ -61,7 +61,7 @@ export default function InventoryReports() {
       }
     }
     return buckets
-  }, [products, movements, getQtyOnHand])
+  }, [products, movements, getQtyOnHand, now])
 
   const deadStock = useMemo(() => {
     return products
@@ -69,31 +69,34 @@ export default function InventoryReports() {
         const qty = getQtyOnHand(p.id)
         if (qty <= 0) return null
         const lastOut = movements.find((m) => m.productId === p.id && m.type === 'OUT')
-        const days = lastOut ? daysSince(lastOut.createdAt) : daysSince(p.createdAt)
+        const days = lastOut ? daysSince(lastOut.createdAt, now) : daysSince(p.createdAt, now)
         if (days < 60) return null
-        return { product: p, qty, days, tiedCapital: qty * p.cost }
+        return { product: p, qty, days, tiedCapital: getStockLineValue(p, qty) }
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
       .sort((a, b) => b.tiedCapital - a.tiedCapital)
       .slice(0, 10)
-  }, [products, movements, getQtyOnHand])
+  }, [products, movements, getQtyOnHand, now])
 
   const maxBucket = Math.max(...aging.map((b) => b.value), 1)
 
   const exportCSV = () => {
-    const header = ['Part Number', 'Name', 'Category', 'Brand', 'Bin', 'Qty', 'Cost', 'Value', 'Status', 'Barcode'].join(',')
+    const header = ['Part Number', 'Name', 'Category', 'Brand', 'Bin', 'Qty', 'Unit', 'Cost', 'Cost Unit', 'Value', 'Status', 'Barcode'].join(',')
     const rows = products.map((p) => {
       const qty = getQtyOnHand(p.id)
       const status = qty <= 0 ? 'OUT' : qty <= p.reorderLevel ? 'LOW' : 'OK'
+      const displayQty = formatStockQty(p, qty).replace(` ${getStockUnitLabel(p)}`, '')
       return [
         p.partNumber,
         `"${p.name.replace(/"/g, '""')}"`,
         p.category,
         p.brand || '',
         p.bin || '',
-        qty,
+        displayQty,
+        getStockUnitLabel(p),
         p.cost.toFixed(2),
-        (qty * p.cost).toFixed(2),
+        getStockUnitLabel(p),
+        getStockLineValue(p, Math.max(0, qty)).toFixed(2),
         status,
         p.barcode || '',
       ].join(',')
@@ -193,7 +196,7 @@ export default function InventoryReports() {
                   <tr key={d.product.id} className="border-b border-border last:border-0 hover:bg-bg-tertiary/50">
                     <td className="py-2 font-mono text-xs text-accent-amber">{d.product.partNumber}</td>
                     <td className="py-2 text-text-secondary text-xs truncate max-w-[300px]">{d.product.name}</td>
-                    <td className="py-2 text-right font-mono text-sm text-text-primary">{d.qty}</td>
+                    <td className="py-2 text-right font-mono text-sm text-text-primary">{formatStockQty(d.product, d.qty)}</td>
                     <td className="py-2 text-right font-mono text-xs text-text-muted">{d.days}d</td>
                     <td className="py-2 text-right font-mono text-sm text-red-400 font-bold">€{d.tiedCapital.toFixed(2)}</td>
                   </tr>
