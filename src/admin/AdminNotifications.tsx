@@ -19,6 +19,8 @@ import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import CustomerFormModal from './components/CustomerFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
+import { FlowPositionBadge } from './components/FulfillmentFlow'
+import { positionForNotification } from '@/lib/fulfillmentFlow'
 
 type FilterType = 'all' | NotificationType
 
@@ -124,7 +126,7 @@ function OrderDetail({ n, onCreateAccount, onCreateInvoice }: { n: OrderNotifica
           onClick={onCreateInvoice}
           className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-green px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all"
         >
-          <Receipt size={12} /> Create Invoice
+          <Receipt size={12} /> Create Invoice & Order
         </button>
       </div>
     </div>
@@ -259,7 +261,7 @@ function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
         )}
         {n.context?.invoiceId && (
           <Link to={`/admin/orders/invoices`} className="flex items-center gap-1.5 text-xs font-mono text-text-secondary hover:text-accent-amber px-3 py-1.5 rounded-lg hover:bg-bg-tertiary border border-border transition-all">
-            <Receipt size={12} /> Open invoices
+            <Receipt size={12} /> Open payment
           </Link>
         )}
         {n.kind === 'invoice_paid_cleanup' && n.context?.quoteId && !archived && (
@@ -352,12 +354,12 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
 
   const handleCreateInvoice = () => {
     const id = createFromOrder(notification.id)
-    if (id) navigate('/admin/invoices')
+    if (id) navigate('/admin/orders')
   }
 
   const handleCreateQuotation = () => {
     const id = createQuotation(notification.id)
-    if (id) navigate('/admin/quotations')
+    if (id) navigate('/admin/orders/quotations')
   }
 
   const getCustomerFormInitial = () => {
@@ -419,6 +421,7 @@ function NotificationCard({ notification, onDelete }: { notification: Notificati
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <TypeBadge type={notification.type} />
+            <FlowPositionBadge compact position={positionForNotification(notification)} />
             <span className="text-text-muted text-xs flex items-center gap-1">
               <Clock size={10} /> {timeAgo(notification.date)}
             </span>
@@ -541,7 +544,7 @@ export default function AdminNotifications() {
           )}
         </div>
       </div>
-      <p className="text-text-secondary text-sm mb-6">Orders, custom part requests, and contact form messages.</p>
+      <p className="text-text-secondary text-sm mb-6">Requests enter the custom route; storefront orders enter the off-the-shelf order route.</p>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">

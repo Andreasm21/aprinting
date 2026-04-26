@@ -1,9 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, ArrowLeftRight, ScanLine, FileBarChart, Truck, Printer } from 'lucide-react'
+import { LayoutDashboard, Package, ArrowLeftRight, ScanLine, FileBarChart, Truck } from 'lucide-react'
 
 const tabs = [
   { path: '/admin/inventory', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/admin/inventory/queue', label: 'Print Queue', icon: Printer },
   { path: '/admin/inventory/products', label: 'Products', icon: Package },
   { path: '/admin/inventory/movements', label: 'Movements', icon: ArrowLeftRight },
   { path: '/admin/inventory/orders', label: 'Purchase Orders', icon: Truck },

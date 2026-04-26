@@ -2,14 +2,18 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Package, FileText, DollarSign, Info, MessageSquare, Bell, Users, Receipt, Mail, BarChart3,
-  Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock, Boxes
+  Trash2, Edit3, Lock, RotateCcw, Plus, TrendingUp, Clock, Boxes, ClipboardList,
 } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import { useInventoryStore } from '@/stores/inventoryStore'
+import { useOrdersStore } from '@/stores/ordersStore'
+import { usePrintJobsStore } from '@/stores/printJobsStore'
 import { useAuditLogStore, type AuditAction, type AuditCategory } from '@/stores/auditLogStore'
+import { FulfillmentFlowMap } from './components/FulfillmentFlow'
+import type { FulfillmentStage } from '@/lib/fulfillmentFlow'
 
 const ACTION_ICONS: Record<AuditAction, typeof Plus> = {
   create: Plus,
@@ -89,12 +93,26 @@ export default function AdminDashboard() {
   const quotationCount = allInvoices.filter((i) => i.type === 'quotation').length
   const unread = getUnreadCount()
   const inventoryCount = useInventoryStore((s) => s.products.length)
+  const orders = useOrdersStore((s) => s.orders)
+  const printJobs = usePrintJobsStore((s) => s.jobs)
+
+  const flowCounts: Partial<Record<FulfillmentStage, number>> = {
+    request: notifications.filter((n) => n.type === 'part_request' || n.type === 'contact').length,
+    quotation: quotationCount,
+    order: orders.filter((o) => o.status === 'pending').length + notifications.filter((n) => n.type === 'order').length,
+    print: printJobs.filter((j) => j.status === 'queued' || j.status === 'printing' || j.status === 'paused').length,
+    payment: invoiceCount,
+    delivery: orders.filter((o) => o.status === 'ready' || o.status === 'shipped' || o.status === 'delivered').length,
+    archive: orders.filter((o) => o.status === 'closed' || o.status === 'cancelled').length,
+  }
 
   const cards = [
+    { label: 'Fulfillment', count: orders.length, icon: ClipboardList, path: '/admin/orders', color: 'amber' },
     { label: 'Notifications', count: notifications.length, unread, icon: Bell, path: '/admin/notifications', color: 'amber' },
     { label: 'Customers', count: customerCount, icon: Users, path: '/admin/customers', color: 'blue' },
-    { label: 'Invoices', count: invoiceCount, icon: Receipt, path: '/admin/invoices', color: 'amber' },
-    { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/quotations', color: 'blue' },
+    { label: 'Payment', count: invoiceCount, icon: Receipt, path: '/admin/orders/invoices', color: 'amber' },
+    { label: 'Quotations', count: quotationCount, icon: FileText, path: '/admin/orders/quotations', color: 'blue' },
+    { label: 'Print', count: printJobs.length, icon: Boxes, path: '/admin/orders/print', color: 'blue' },
     { label: 'Inventory', count: inventoryCount, icon: Boxes, path: '/admin/inventory', color: 'amber' },
     { label: 'Analytics', icon: BarChart3, path: '/admin/analytics', color: 'green' },
     { label: 'Emails', icon: Mail, path: '/admin/emails', color: 'green' },
@@ -109,7 +127,11 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1 className="font-mono text-2xl font-bold text-text-primary mb-2">Dashboard</h1>
-      <p className="text-text-secondary text-sm mb-8">Manage your Axiom website content.</p>
+      <p className="text-text-secondary text-sm mb-8">Run the admin platform through the fulfillment flow.</p>
+
+      <div className="mb-6">
+        <FulfillmentFlowMap counts={flowCounts} compact />
+      </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((card) => (

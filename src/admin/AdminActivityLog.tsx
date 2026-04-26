@@ -24,7 +24,7 @@ const CATEGORY_COLORS: Record<AuditCategory, string> = {
   system: 'text-red-400 bg-red-400/10',
 }
 
-const CATEGORIES: ('all' | AuditCategory)[] = ['all', 'customer', 'invoice', 'quotation', 'notification', 'product', 'content', 'system']
+const CATEGORIES: ('all' | AuditCategory)[] = ['all', 'customer', 'order', 'quotation', 'invoice', 'notification', 'product', 'content', 'system']
 
 function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString('en-GB', {

@@ -8,14 +8,19 @@ import {
   type PrintJob,
   type JobPriority,
 } from '@/stores/printJobsStore'
+import { useCustomersStore } from '@/stores/customersStore'
+import { useInventoryStore } from '@/stores/inventoryStore'
+import { useInvoicesStore } from '@/stores/invoicesStore'
+import { useOrdersStore } from '@/stores/ordersStore'
+import InventoryLayout from './InventoryLayout'
+import OrdersLayout from '../orders/OrdersLayout'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { FlowPositionBadge } from '../components/FulfillmentFlow'
+import { positionForPrintJob } from '@/lib/fulfillmentFlow'
 
 const PRIORITY_WEIGHT: Record<JobPriority, number> = {
   urgent: 3, high: 2, normal: 1, low: 0,
 }
-import { useCustomersStore } from '@/stores/customersStore'
-import { useInventoryStore } from '@/stores/inventoryStore'
-import InventoryLayout from './InventoryLayout'
-import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 const PRIORITY_STYLE: Record<JobPriority, string> = {
   urgent: 'text-red-400 bg-red-400/10 border-red-400/30',
@@ -43,7 +48,7 @@ function formatDuration(hours?: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
-export default function InventoryQueue() {
+export default function InventoryQueue({ layout = 'inventory' }: { layout?: 'inventory' | 'orders' }) {
   const jobs = usePrintJobsStore((s) => s.jobs)
   const addJob = usePrintJobsStore((s) => s.addJob)
   const updateJob = usePrintJobsStore((s) => s.updateJob)
@@ -95,6 +100,9 @@ export default function InventoryQueue() {
   const completedTodayCount = completedToday.filter((j) => j.status === 'completed').length
 
   const customers = useCustomersStore((s) => s.customers)
+  const invoices = useInvoicesStore((s) => s.invoices)
+  const orders = useOrdersStore((s) => s.orders)
+  const Wrapper = layout === 'orders' ? OrdersLayout : InventoryLayout
 
   const stats = [
     { label: 'Currently Printing', value: activeJob ? '1' : '0', color: activeJob ? 'text-accent-amber' : 'text-text-muted' },
@@ -104,9 +112,12 @@ export default function InventoryQueue() {
   ]
 
   return (
-    <InventoryLayout>
+    <Wrapper>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-text-secondary text-sm">Print queue · 1 printer</p>
+        <div>
+          <p className="text-text-secondary text-sm">Print Job Manager · Print stage · 1 printer</p>
+          <p className="text-text-muted text-xs mt-1">Print jobs sit inside Print for both custom and off-the-shelf orders.</p>
+        </div>
         <button onClick={() => setCreating(true)} className="btn-amber text-sm py-2 px-4 flex items-center gap-1.5">
           <Plus size={14} /> Add Print Job
         </button>
@@ -133,12 +144,22 @@ export default function InventoryQueue() {
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex-1 min-w-0">
                 <p className="font-mono text-base text-accent-amber font-bold truncate">{activeJob.description}</p>
-                <p className="text-text-muted text-xs mt-1">
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <FlowPositionBadge
+                    compact
+                    position={positionForPrintJob(
+                      activeJob,
+                      activeJob.documentId ? invoices.find((inv) => inv.id === activeJob.documentId) : undefined,
+                      orders.find((o) => o.invoiceId === activeJob.documentId || o.quotationId === activeJob.documentId),
+                    )}
+                  />
+                  <p className="text-text-muted text-xs">
                   {activeJob.material && `${activeJob.material} · `}
                   {activeJob.weightGrams ? `${activeJob.weightGrams}g · ` : ''}
                   {activeJob.estimatedHours ? `Est. ${formatDuration(activeJob.estimatedHours)} · ` : ''}
                   Started {formatDateTime(activeJob.startedAt)}
-                </p>
+                  </p>
+                </div>
               </div>
               <div className="flex gap-1.5 shrink-0">
                 <button onClick={() => completeJob(activeJob.id)} className="text-xs font-mono py-1.5 px-3 rounded bg-accent-green/10 text-accent-green hover:bg-accent-green/20 border border-accent-green/30 flex items-center gap-1">
@@ -188,7 +209,7 @@ export default function InventoryQueue() {
 
       {/* Quick Wins */}
       {quickWins.length > 0 && (
-        <div className="card-base p-4 mb-4 border-l-4 border-accent-amber bg-accent-amber/5">
+        <div className="card-base p-4 mb-4 border-accent-amber/30 bg-accent-amber/5">
           <div className="flex items-center gap-2 mb-2">
             <Zap size={14} className="text-accent-amber" />
             <h3 className="font-mono text-xs font-bold text-accent-amber uppercase tracking-wider">Quick Wins</h3>
@@ -240,13 +261,23 @@ export default function InventoryQueue() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-text-primary truncate">{j.description}</p>
-                  <p className="text-[10px] text-text-muted font-mono">
-                    {j.material && `${j.material} · `}
-                    {j.weightGrams ? `${j.weightGrams}g · ` : ''}
-                    {j.estimatedHours ? `${formatDuration(j.estimatedHours)} · ` : ''}
-                    qty {j.quantity}
-                    {j.status === 'paused' && <span className="text-accent-amber"> · PAUSED</span>}
-                  </p>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <FlowPositionBadge
+                      compact
+                      position={positionForPrintJob(
+                        j,
+                        j.documentId ? invoices.find((inv) => inv.id === j.documentId) : undefined,
+                        orders.find((o) => o.invoiceId === j.documentId || o.quotationId === j.documentId),
+                      )}
+                    />
+                    <p className="text-[10px] text-text-muted font-mono">
+                      {j.material && `${j.material} · `}
+                      {j.weightGrams ? `${j.weightGrams}g · ` : ''}
+                      {j.estimatedHours ? `${formatDuration(j.estimatedHours)} · ` : ''}
+                      qty {j.quantity}
+                      {j.status === 'paused' && <span className="text-accent-amber"> · PAUSED</span>}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {!activeJob && (
@@ -287,6 +318,14 @@ export default function InventoryQueue() {
                   <AlertTriangle size={12} className="text-red-400 shrink-0" />
                 )}
                 <span className="text-text-secondary flex-1 truncate">{j.description}</span>
+                <FlowPositionBadge
+                  compact
+                  position={positionForPrintJob(
+                    j,
+                    j.documentId ? invoices.find((inv) => inv.id === j.documentId) : undefined,
+                    orders.find((o) => o.invoiceId === j.documentId || o.quotationId === j.documentId),
+                  )}
+                />
                 <span className={`font-mono text-[10px] uppercase ${j.status === 'completed' ? 'text-accent-green' : 'text-red-400'}`}>
                   {j.status}
                 </span>
@@ -331,7 +370,7 @@ export default function InventoryQueue() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </InventoryLayout>
+    </Wrapper>
   )
 }
 

@@ -104,7 +104,7 @@ export default function QuoteCustomerPickerModal({ onClose }: { onClose: () => v
     clearCart()
     closeCart()
     onClose()
-    navigate('/admin/quotations')
+    navigate('/admin/orders/quotations')
     return id
   }
 

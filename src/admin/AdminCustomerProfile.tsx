@@ -590,7 +590,7 @@ export default function AdminCustomerProfile() {
             <button onClick={() => setEditing(true)} className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1">
               <Edit3 size={12} /> Edit
             </button>
-            <button onClick={() => navigate('/admin/invoices')} className="btn-amber text-xs py-1.5 px-3 flex items-center gap-1">
+            <button onClick={() => navigate('/admin/orders/invoices')} className="btn-amber text-xs py-1.5 px-3 flex items-center gap-1">
               <Plus size={12} /> Invoice
             </button>
           </div>

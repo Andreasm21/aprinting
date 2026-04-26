@@ -12,6 +12,8 @@ import { sendEmail } from '@/lib/emailClient'
 import { quotationEmail } from '@/lib/emailTemplates'
 import { useEmailLogStore } from '@/stores/emailLogStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
+import { FlowPositionBadge } from './components/FulfillmentFlow'
+import { positionForDocument } from '@/lib/fulfillmentFlow'
 
 const STATUS_COLORS: Record<DocumentStatus, string> = {
   draft: 'text-text-muted border-border',
@@ -30,6 +32,10 @@ const DEFAULT_TERMS = `• This quotation is valid for 30 days from the date of 
 • Standard delivery within Cyprus is included for orders over €50.
 • Revisions to the 3D model are limited to 2 rounds; additional revisions at €15/hr.
 • All intellectual property remains with the client.`
+
+function PlainLayout({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
 
 function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number, extraCharge = 0) {
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
@@ -113,7 +119,7 @@ export default function AdminQuotations() {
   // when loaded under the legacy /admin/quotations show the standalone header.
   const location = useLocation()
   const insideOrders = location.pathname.startsWith('/admin/orders')
-  const Wrapper = insideOrders ? OrdersLayout : (({ children }: { children: React.ReactNode }) => <div>{children}</div>)
+  const Wrapper = insideOrders ? OrdersLayout : PlainLayout
 
   return (
     <Wrapper>
@@ -198,6 +204,7 @@ export default function AdminQuotations() {
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase hidden sm:table-cell">Date</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase hidden md:table-cell">Valid Until</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Total</th>
+                <th className="text-center p-3 font-mono text-xs text-text-muted uppercase">Flow</th>
                 <th className="text-center p-3 font-mono text-xs text-text-muted uppercase">Status</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Actions</th>
               </tr>
@@ -227,6 +234,9 @@ export default function AdminQuotations() {
                     ) : '—'}
                   </td>
                   <td className="p-3 text-right font-mono text-sm text-text-primary">€{inv.total.toFixed(2)}</td>
+                  <td className="p-3 text-center">
+                    <FlowPositionBadge compact position={positionForDocument(inv)} />
+                  </td>
                   <td className="p-3 text-center">
                     {inv.status === 'paid' ? (
                       <span className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border ${STATUS_COLORS['paid']}`}>

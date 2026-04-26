@@ -12,6 +12,8 @@ import { useEmailLogStore } from '@/stores/emailLogStore'
 import { sendEmail } from '@/lib/emailClient'
 import { orderTrackingEmail } from '@/lib/emailTemplates'
 import DocumentPreview from '../components/DocumentPreview'
+import { FlowPositionBadge, FulfillmentFlowMap } from '../components/FulfillmentFlow'
+import { positionForDocument, positionForOrder } from '@/lib/fulfillmentFlow'
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending: 'text-accent-amber bg-accent-amber/10 border-accent-amber/30',
@@ -83,6 +85,7 @@ export default function AdminOrderProfile() {
   const quote = order.quotationId ? invoices.find((i) => i.id === order.quotationId) : undefined
   const invoice = order.invoiceId ? invoices.find((i) => i.id === order.invoiceId) : undefined
   const previewDoc = previewDocId ? invoices.find((i) => i.id === previewDocId) : undefined
+  const flowPosition = positionForOrder(order, invoice)
 
   const handleStatusChange = async (to: OrderStatus) => {
     if (to === order.status) return
@@ -169,6 +172,7 @@ export default function AdminOrderProfile() {
           <ArrowLeft size={14} /> Back
         </button>
         <div className="flex items-center gap-2">
+          <FlowPositionBadge position={flowPosition} />
           <span className={`text-[11px] font-mono uppercase px-3 py-1 rounded border ${STATUS_STYLE[order.status]}`}>
             {ORDER_STATUS_LABEL[order.status]}
           </span>
@@ -237,6 +241,10 @@ export default function AdminOrderProfile() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <FulfillmentFlowMap active={flowPosition} compact />
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left — linked documents + customer */}
         <div className="lg:col-span-2 space-y-4">
@@ -250,7 +258,10 @@ export default function AdminOrderProfile() {
                   <div>
                     <p className="text-[10px] font-mono uppercase text-text-muted">Quotation</p>
                     <p className="font-mono text-sm font-bold text-text-primary">{quote.documentNumber}</p>
-                    <p className="text-text-muted text-xs mt-1">€{(quote.totalOverride ?? quote.total).toFixed(2)} · {new Date(quote.date).toLocaleDateString('en-GB')}</p>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <FlowPositionBadge compact position={positionForDocument(quote, order)} />
+                      <p className="text-text-muted text-xs">€{(quote.totalOverride ?? quote.total).toFixed(2)} · {new Date(quote.date).toLocaleDateString('en-GB')}</p>
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setPreviewDocId(quote.id)} className="btn-outline text-xs py-1.5 px-3">
@@ -270,7 +281,10 @@ export default function AdminOrderProfile() {
                   <div>
                     <p className="text-[10px] font-mono uppercase text-text-muted">Invoice</p>
                     <p className="font-mono text-sm font-bold text-text-primary">{invoice.documentNumber}</p>
-                    <p className="text-text-muted text-xs mt-1">€{(invoice.totalOverride ?? invoice.total).toFixed(2)} · {invoice.status.toUpperCase()}</p>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <FlowPositionBadge compact position={positionForDocument(invoice, order)} />
+                      <p className="text-text-muted text-xs">€{(invoice.totalOverride ?? invoice.total).toFixed(2)} · {invoice.status.toUpperCase()}</p>
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setPreviewDocId(invoice.id)} className="btn-outline text-xs py-1.5 px-3">

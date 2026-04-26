@@ -12,9 +12,9 @@ const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/notifications', label: 'Notifications', icon: Bell },
   { path: '/admin/customers', label: 'Customers', icon: Users },
-  // Orders is the umbrella — its sub-tabs (Overview, Quotations, Invoices)
+  // Fulfillment is the umbrella — its sub-tabs (Orders, Quotations, Print, Payment)
   // appear inside the page via OrdersLayout.
-  { path: '/admin/orders', label: 'Orders', icon: ClipboardList },
+  { path: '/admin/orders', label: 'Fulfillment', icon: ClipboardList },
   { path: '/admin/emails', label: 'Emails', icon: Mail },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/admin/activity', label: 'Activity Log', icon: History },

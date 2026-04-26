@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, ArrowRight, ClipboardList, FileText, Receipt, Package, Trash2 } from 'lucide-react'
 import { useOrdersStore, ORDER_STATUS_LABEL, type OrderStatus } from '@/stores/ordersStore'
+import { useInvoicesStore } from '@/stores/invoicesStore'
 import OrdersLayout from './OrdersLayout'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { FlowPositionBadge } from '../components/FulfillmentFlow'
+import { positionForOrder } from '@/lib/fulfillmentFlow'
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending: 'text-accent-amber bg-accent-amber/10 border-accent-amber/30',
@@ -21,6 +24,7 @@ export default function AdminOrdersOverview() {
   const orders = useOrdersStore((s) => s.orders)
   const loading = useOrdersStore((s) => s.loading)
   const deleteOrder = useOrdersStore((s) => s.deleteOrder)
+  const invoices = useInvoicesStore((s) => s.invoices)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | OrderStatus>('all')
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null)
@@ -69,7 +73,7 @@ export default function AdminOrdersOverview() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {(['pending', 'in_production', 'ready', 'shipped'] as OrderStatus[]).map((s) => {
+        {(['pending', 'in_production', 'ready', 'delivered'] as OrderStatus[]).map((s) => {
           const count = orders.filter((o) => o.status === s).length
           return (
             <div key={s} className="card-base p-3">
@@ -101,6 +105,7 @@ export default function AdminOrdersOverview() {
                 <th className="py-3 px-4">Quote</th>
                 <th className="py-3 px-4">Invoice</th>
                 <th className="py-3 px-4 text-right">Total</th>
+                <th className="py-3 px-4">Flow</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Created</th>
                 <th className="py-3 px-4 w-20 text-right">Actions</th>
@@ -118,6 +123,12 @@ export default function AdminOrdersOverview() {
                     {o.invoiceId ? <span className="inline-flex items-center gap-1"><Receipt size={11} /> linked</span> : '—'}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-sm text-text-primary">€{o.total.toFixed(2)}</td>
+                  <td className="py-3 px-4">
+                    <FlowPositionBadge
+                      compact
+                      position={positionForOrder(o, o.invoiceId ? invoices.find((inv) => inv.id === o.invoiceId) : undefined)}
+                    />
+                  </td>
                   <td className="py-3 px-4">
                     <span className={`inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${STATUS_STYLE[o.status]}`}>
                       {ORDER_STATUS_LABEL[o.status]}

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import Hero from '@/components/Hero'
 import Services from '@/components/Services'
@@ -133,11 +133,12 @@ function App() {
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
+        <Route path="/admin/orders/print" element={<AdminLoader><InventoryQueue layout="orders" /></AdminLoader>} />
         <Route path="/admin/orders/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
         <Route path="/admin/orders/:id" element={<AdminLoader><AdminOrderProfile /></AdminLoader>} />
         {/* Legacy routes — redirect users who bookmarked the old paths */}
-        <Route path="/admin/invoices" element={<AdminLoader><AdminInvoices /></AdminLoader>} />
-        <Route path="/admin/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
+        <Route path="/admin/invoices" element={<Navigate to="/admin/orders/invoices" replace />} />
+        <Route path="/admin/quotations" element={<Navigate to="/admin/orders/quotations" replace />} />
         <Route path="/admin/emails" element={<AdminLoader><AdminEmails /></AdminLoader>} />
         <Route path="/admin/analytics" element={<AdminLoader><AdminAnalytics /></AdminLoader>} />
         <Route path="/admin/products" element={<AdminLoader><AdminProducts /></AdminLoader>} />

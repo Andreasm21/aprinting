@@ -8,12 +8,19 @@ import LineItemsEditor from './components/LineItemsEditor'
 import DocumentPreview from './components/DocumentPreview'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import OrdersLayout from './orders/OrdersLayout'
+import { useOrdersStore } from '@/stores/ordersStore'
+import { FlowPositionBadge } from './components/FulfillmentFlow'
+import { positionForDocument } from '@/lib/fulfillmentFlow'
 
 const STATUS_COLORS: Record<DocumentStatus, string> = {
   draft: 'text-text-muted border-border',
   sent: 'text-accent-blue border-accent-blue/30 bg-accent-blue/5',
   paid: 'text-accent-green border-accent-green/30 bg-accent-green/5',
   cancelled: 'text-red-400 border-red-400/30 bg-red-400/5',
+}
+
+function PlainLayout({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
 }
 
 function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: number, discountPercent: number, extraCharge = 0) {
@@ -27,6 +34,7 @@ function calcTotals(lineItems: InvoiceLineItem[], deliveryFee: number, vatRate: 
 
 export default function AdminInvoices() {
   const { invoices, addInvoice, updateInvoice, deleteInvoice, getNextNumber } = useInvoicesStore()
+  const orders = useOrdersStore((s) => s.orders)
 
 
   const [search, setSearch] = useState('')
@@ -94,7 +102,7 @@ export default function AdminInvoices() {
 
   const location = useLocation()
   const insideOrders = location.pathname.startsWith('/admin/orders')
-  const Wrapper = insideOrders ? OrdersLayout : (({ children }: { children: React.ReactNode }) => <div>{children}</div>)
+  const Wrapper = insideOrders ? OrdersLayout : PlainLayout
 
   return (
     <Wrapper>
@@ -178,6 +186,7 @@ export default function AdminInvoices() {
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase">Customer</th>
                 <th className="text-left p-3 font-mono text-xs text-text-muted uppercase hidden sm:table-cell">Date</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Total</th>
+                <th className="text-center p-3 font-mono text-xs text-text-muted uppercase">Flow</th>
                 <th className="text-center p-3 font-mono text-xs text-text-muted uppercase">Status</th>
                 <th className="text-right p-3 font-mono text-xs text-text-muted uppercase">Actions</th>
               </tr>
@@ -200,6 +209,9 @@ export default function AdminInvoices() {
                   </td>
                   <td className="p-3 text-text-secondary text-xs hidden sm:table-cell">{new Date(inv.date).toLocaleDateString('en-GB')}</td>
                   <td className="p-3 text-right font-mono text-sm text-text-primary">€{inv.total.toFixed(2)}</td>
+                  <td className="p-3 text-center">
+                    <FlowPositionBadge compact position={positionForDocument(inv, orders.find((o) => o.invoiceId === inv.id))} />
+                  </td>
                   <td className="p-3 text-center">
                     {inv.locked ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-1 rounded-full border text-accent-green border-accent-green/30 bg-accent-green/5">

@@ -389,7 +389,7 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
       // Spin up the umbrella Order — but only if one doesn't already exist
       // for this quotation (idempotent: re-converting won't create dupes).
       const ordersStore = useOrdersStore.getState()
-      let orderId = ordersStore.getOrderByQuotationId(quotationId)?.id
+      const orderId = ordersStore.getOrderByQuotationId(quotationId)?.id
       if (!orderId) {
         const orderNumber = ordersStore.getNextOrderNumber()
         const finalTotal = quote.totalOverride ?? quote.total
@@ -436,6 +436,31 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
       if (!order) return null
 
       const customer = useCustomersStore.getState().getCustomerByEmail(order.customer.email)
+      const ensureStorefrontOrder = (invoiceId: string, invoiceNumber: string, total: number) => {
+        const ordersStore = useOrdersStore.getState()
+        if (ordersStore.orders.some((o) => o.invoiceId === invoiceId)) return
+        const now = new Date().toISOString()
+        void ordersStore.addOrder({
+          orderNumber: ordersStore.getNextOrderNumber(),
+          customerId: customer?.id,
+          customerName: order.customer.name,
+          invoiceId,
+          status: 'pending',
+          total,
+          currency: 'EUR',
+          notes: `Off-the-shelf order created from storefront notification ${orderId}`,
+          history: [
+            { type: 'order_created', date: order.date || now, by: 'customer', note: 'Off-the-shelf storefront order received' },
+            { type: 'invoice_generated', date: now, by: 'system', invoiceNumber },
+          ],
+        })
+      }
+
+      const existingInvoice = get().invoices.find((inv) => inv.type === 'invoice' && inv.sourceOrderId === orderId)
+      if (existingInvoice) {
+        ensureStorefrontOrder(existingInvoice.id, existingInvoice.documentNumber, existingInvoice.totalOverride ?? existingInvoice.total)
+        return existingInvoice.id
+      }
 
       const lineItems: InvoiceLineItem[] = order.items.map((item) => ({
         description: item.name,
@@ -473,7 +498,9 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         sourceOrderId: orderId,
       }
 
-      return get().addInvoice(data)
+      const invoiceId = get().addInvoice(data)
+      ensureStorefrontOrder(invoiceId, data.documentNumber, total)
+      return invoiceId
     },
 
     createQuotationFromPartRequest: (requestId) => {

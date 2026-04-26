@@ -171,7 +171,7 @@ export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
       }
       set((state) => ({ jobs: [job, ...state.jobs] }))
       void sbUpsert(job)
-      useAuditLogStore.getState().log('create', 'product', `Print job queued: ${job.description}`)
+      useAuditLogStore.getState().log('create', 'order', `Print job queued: ${job.description}`)
       return id
     },
 
@@ -189,7 +189,7 @@ export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
 
     deleteJob: (id) => {
       const j = get().jobs.find((x) => x.id === id)
-      if (j) useAuditLogStore.getState().log('delete', 'product', `Print job deleted: ${j.description}`)
+      if (j) useAuditLogStore.getState().log('delete', 'order', `Print job deleted: ${j.description}`)
       set((state) => ({ jobs: state.jobs.filter((x) => x.id !== id) }))
       void sbDelete(id)
     },
@@ -202,19 +202,19 @@ export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
       }
       get().updateJob(id, { status: 'printing', startedAt: new Date().toISOString(), progress: 0 })
       const j = get().jobs.find((x) => x.id === id)
-      if (j) useAuditLogStore.getState().log('status_change', 'product', `Print started: ${j.description}`)
+      if (j) useAuditLogStore.getState().log('status_change', 'order', `Print started: ${j.description}`)
     },
 
     completeJob: (id) => {
       get().updateJob(id, { status: 'completed', completedAt: new Date().toISOString(), progress: 100 })
       const j = get().jobs.find((x) => x.id === id)
-      if (j) useAuditLogStore.getState().log('status_change', 'product', `Print completed: ${j.description}`)
+      if (j) useAuditLogStore.getState().log('status_change', 'order', `Print completed: ${j.description}`)
     },
 
     failJob: (id) => {
       get().updateJob(id, { status: 'failed', completedAt: new Date().toISOString() })
       const j = get().jobs.find((x) => x.id === id)
-      if (j) useAuditLogStore.getState().log('status_change', 'product', `Print failed: ${j.description}`)
+      if (j) useAuditLogStore.getState().log('status_change', 'order', `Print failed: ${j.description}`)
     },
 
     pauseJob: (id) => {
@@ -224,7 +224,7 @@ export const usePrintJobsStore = create<PrintJobsState>((set, get) => {
     fastTrack: (id) => {
       get().updateJob(id, { priority: 'urgent', position: 0 })
       const j = get().jobs.find((x) => x.id === id)
-      if (j) useAuditLogStore.getState().log('update', 'product', `Print fast-tracked: ${j.description}`)
+      if (j) useAuditLogStore.getState().log('update', 'order', `Print fast-tracked: ${j.description}`)
     },
 
     reorderJob: (id, newPosition) => {

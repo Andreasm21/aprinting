@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Mail, Globe, Copy, Check, FileText, ChevronDown } from 'lucide-react'
 import { useNotificationsStore, type OrderNotification, type PartRequestNotification } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
+import { FlowPositionBadge } from './components/FulfillmentFlow'
+import { positionForEmailTemplate } from '@/lib/fulfillmentFlow'
 
 type TemplateName = 'welcome' | 'order_confirmed' | 'order_ready' | 'shipped' | 'quote_ready'
 type Lang = 'en' | 'gr'
@@ -344,6 +346,14 @@ const templateLabels: Record<TemplateName, string> = {
   quote_ready: 'Quote Ready',
 }
 
+const templateFlowKey: Record<TemplateName, string> = {
+  welcome: 'welcome',
+  order_confirmed: 'order_confirmed',
+  order_ready: 'order_ready',
+  shipped: 'shipped',
+  quote_ready: 'quote_ready',
+}
+
 export default function AdminEmails() {
   const [activeTemplate, setActiveTemplate] = useState<TemplateName>('welcome')
   const [lang, setLang] = useState<Lang>('en')
@@ -407,7 +417,7 @@ export default function AdminEmails() {
   return (
     <div>
       <h1 className="font-mono text-2xl font-bold text-text-primary mb-2">Email Templates</h1>
-      <p className="text-text-secondary text-sm mb-6">Ready-to-copy email templates in English and Greek. Select a source to auto-fill variables.</p>
+      <p className="text-text-secondary text-sm mb-6">Ready-to-copy emails mapped to the fulfillment flow. Confirmation emails belong to Order.</p>
 
       {/* Template tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
@@ -423,6 +433,7 @@ export default function AdminEmails() {
           >
             <Mail size={12} />
             {templateLabels[key]}
+            <FlowPositionBadge compact position={positionForEmailTemplate(templateFlowKey[key])} />
           </button>
         ))}
       </div>
@@ -531,7 +542,10 @@ export default function AdminEmails() {
             {/* Subject */}
             <div className="px-5 py-3 border-b border-border bg-bg-tertiary">
               <p className="text-text-muted text-[10px] font-mono uppercase mb-1">Subject</p>
-              <p className="font-mono text-sm text-text-primary">{filledSubject}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-mono text-sm text-text-primary">{filledSubject}</p>
+                <FlowPositionBadge compact position={positionForEmailTemplate(templateFlowKey[activeTemplate])} />
+              </div>
             </div>
 
             {/* Body */}
