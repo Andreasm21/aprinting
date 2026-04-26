@@ -1,10 +1,10 @@
 import { X, Plus, Minus, ShoppingBag, Trash2 } from 'lucide-react'
-import { useCartStore } from '@/stores/cartStore'
+import { useCartStore, unitPriceFor } from '@/stores/cartStore'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/hooks/useTranslation'
 
 export default function Cart() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, getTotal } = useCartStore()
+  const { items, isOpen, closeCart, removeItem, updateQuantity, getTotal, keyFor } = useCartStore()
   const { openCheckout } = useAppStore()
   const language = useAppStore((s) => s.language)
   const t = useTranslation()
@@ -64,7 +64,7 @@ export default function Cart() {
                         {/* Qty controls */}
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(keyFor(item), item.quantity - 1)}
                             className="w-6 h-6 rounded bg-bg-primary border border-border flex items-center justify-center hover:border-accent-amber transition-colors"
                           >
                             <Minus size={12} className="text-text-secondary" />
@@ -73,7 +73,7 @@ export default function Cart() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(keyFor(item), item.quantity + 1)}
                             className="w-6 h-6 rounded bg-bg-primary border border-border flex items-center justify-center hover:border-accent-amber transition-colors"
                           >
                             <Plus size={12} className="text-text-secondary" />
@@ -81,13 +81,13 @@ export default function Cart() {
                         </div>
 
                         <span className="font-accent text-sm text-accent-amber">
-                          €{(item.product.price * item.quantity).toFixed(2)}
+                          €{(unitPriceFor(item) * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     </div>
 
                     <button
-                      onClick={() => removeItem(item.product.id)}
+                      onClick={() => removeItem(keyFor(item))}
                       className="p-1 self-start hover:bg-bg-primary rounded transition-colors"
                     >
                       <Trash2 size={14} className="text-text-muted hover:text-red-400" />

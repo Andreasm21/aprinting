@@ -46,6 +46,8 @@ const AdminOrdersOverview = lazy(() => import('@/admin/orders/AdminOrdersOvervie
 const AdminOrderProfile = lazy(() => import('@/admin/orders/AdminOrderProfile'))
 const PublicQuoteView = lazy(() => import('@/public/PublicQuoteView'))
 const PublicOrderTracking = lazy(() => import('@/public/PublicOrderTracking'))
+const AdminStlViewer = lazy(() => import('@/admin/AdminStlViewer'))
+const ProductPage = lazy(() => import('@/pages/ProductPage'))
 
 // Portal (customer-facing)
 const PortalLayout = lazy(() => import('@/portal/PortalLayout'))
@@ -115,6 +117,12 @@ function App() {
             <PublicOrderTracking />
           </Suspense>
         } />
+        {/* Public product detail page */}
+        <Route path="/p/:slug" element={
+          <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><div className="font-mono text-accent-amber animate-pulse">Loading product...</div></div>}>
+            <ProductPage />
+          </Suspense>
+        } />
         <Route path="/admin" element={<AdminLoader><AdminDashboard /></AdminLoader>} />
         <Route path="/admin/notifications" element={<AdminLoader><AdminNotifications /></AdminLoader>} />
         <Route path="/admin/customers" element={<AdminLoader><AdminCustomers /></AdminLoader>} />
@@ -130,6 +138,8 @@ function App() {
         <Route path="/admin/inventory/reports" element={<AdminLoader><InventoryReports /></AdminLoader>} />
         <Route path="/admin/inventory/orders" element={<AdminLoader><InventoryOrders /></AdminLoader>} />
         <Route path="/admin/inventory/queue" element={<AdminLoader><InventoryQueue /></AdminLoader>} />
+        {/* Admin STL viewer — internal tool, not part of inventory */}
+        <Route path="/admin/stl-viewer" element={<AdminLoader><AdminStlViewer /></AdminLoader>} />
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />

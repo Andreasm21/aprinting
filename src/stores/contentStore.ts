@@ -147,6 +147,9 @@ interface SbProductRow {
   id: number
   name: string
   name_gr: string | null
+  slug: string | null
+  collection: string | null
+  series_no: number | null
   category: string
   material: string | null
   price: number
@@ -154,10 +157,24 @@ interface SbProductRow {
   description_gr: string | null
   badge: string | null
   in_stock: boolean
+  ships_in: string | null
   model_url: string | null
   image_url: string | null
+  filaments: unknown // JSONB array — Supabase returns parsed JSON
+  colors: unknown
+  specs: unknown
   created_at: string
   updated_at: string
+}
+
+/** Slugify a product name → URL-safe lowercase string. */
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    || `product-${Date.now()}`
 }
 
 function productToRow(p: Product): Omit<SbProductRow, 'created_at' | 'updated_at'> {
@@ -165,6 +182,9 @@ function productToRow(p: Product): Omit<SbProductRow, 'created_at' | 'updated_at
     id: p.id,
     name: p.name,
     name_gr: p.nameGr ?? null,
+    slug: p.slug ?? slugify(p.name),
+    collection: p.collection ?? null,
+    series_no: p.seriesNo ?? null,
     category: p.category,
     material: p.material ?? null,
     price: p.price,
@@ -172,16 +192,32 @@ function productToRow(p: Product): Omit<SbProductRow, 'created_at' | 'updated_at
     description_gr: p.descriptionGr ?? null,
     badge: p.badge ?? null,
     in_stock: p.inStock,
+    ships_in: p.shipsIn ?? null,
     model_url: p.modelUrl ?? null,
     image_url: p.imageUrl ?? null,
+    filaments: p.filaments ?? [],
+    colors: p.colors ?? [],
+    specs: p.specs ?? {},
   }
 }
 
 function rowToProduct(r: SbProductRow): Product {
+  // JSONB columns may come back as parsed values OR (rarely) string from
+  // some Supabase paths. Defensive parsing keeps existing rows working.
+  const parseJson = <T>(v: unknown, fallback: T): T => {
+    if (v == null) return fallback
+    if (typeof v === 'string') {
+      try { return JSON.parse(v) as T } catch { return fallback }
+    }
+    return v as T
+  }
   return {
     id: r.id,
     name: r.name,
     nameGr: r.name_gr ?? '',
+    slug: r.slug ?? undefined,
+    collection: r.collection ?? undefined,
+    seriesNo: r.series_no ?? undefined,
     category: (r.category || 'fdm') as Product['category'],
     material: r.material ?? '',
     price: Number(r.price),
@@ -189,8 +225,12 @@ function rowToProduct(r: SbProductRow): Product {
     descriptionGr: r.description_gr ?? '',
     badge: r.badge ?? undefined,
     inStock: r.in_stock,
+    shipsIn: r.ships_in ?? undefined,
     modelUrl: r.model_url ?? undefined,
     imageUrl: r.image_url ?? undefined,
+    filaments: parseJson(r.filaments, []),
+    colors: parseJson(r.colors, []),
+    specs: parseJson(r.specs, {}),
   }
 }
 

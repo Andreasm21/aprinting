@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { X, Check, CreditCard, ShoppingBag, ArrowLeft, ArrowRight, Package, Truck } from 'lucide-react'
-import { useCartStore } from '@/stores/cartStore'
+import { useCartStore, unitPriceFor } from '@/stores/cartStore'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useNotificationsStore } from '@/stores/notificationsStore'
@@ -10,7 +10,7 @@ import type { CustomerInfo } from '@/types'
 export default function Checkout() {
   const t = useTranslation()
   const { showCheckout, checkoutStep, setCheckoutStep, closeCheckout } = useAppStore()
-  const { items, getTotal, clearCart, updateQuantity, removeItem } = useCartStore()
+  const { items, getTotal, clearCart, updateQuantity, removeItem, keyFor } = useCartStore()
   const language = useAppStore((s) => s.language)
 
   const [info, setInfo] = useState<CustomerInfo>({
@@ -125,14 +125,14 @@ export default function Checkout() {
                       <p className="font-accent text-xs text-text-muted">€{item.product.price} each</p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                      <button onClick={() => updateQuantity(keyFor(item), item.quantity - 1)}
                         className="w-6 h-6 rounded bg-bg-primary border border-border flex items-center justify-center text-text-secondary hover:border-accent-amber transition-colors text-xs">−</button>
                       <span className="font-accent text-sm w-5 text-center text-text-primary">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                      <button onClick={() => updateQuantity(keyFor(item), item.quantity + 1)}
                         className="w-6 h-6 rounded bg-bg-primary border border-border flex items-center justify-center text-text-secondary hover:border-accent-amber transition-colors text-xs">+</button>
                     </div>
-                    <span className="font-accent text-sm text-accent-amber w-16 text-right">€{(item.product.price * item.quantity).toFixed(2)}</span>
-                    <button onClick={() => removeItem(item.product.id)} className="text-text-muted hover:text-red-400 text-xs">✕</button>
+                    <span className="font-accent text-sm text-accent-amber w-16 text-right">€{(unitPriceFor(item) * item.quantity).toFixed(2)}</span>
+                    <button onClick={() => removeItem(keyFor(item))} className="text-text-muted hover:text-red-400 text-xs">✕</button>
                   </div>
                 )
               })}

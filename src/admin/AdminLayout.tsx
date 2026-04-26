@@ -4,7 +4,7 @@ import {
   Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink,
   Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, Lock, LogOut, Boxes,
   UserCog, History, ClipboardList, ChevronDown, Inbox, Printer, Receipt,
-  ArrowLeftRight, Truck, ScanLine, FileBarChart,
+  ArrowLeftRight, Truck, ScanLine, FileBarChart, Image as ImageIcon,
 } from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
 import { useContentStore } from '@/stores/contentStore'
@@ -71,6 +71,7 @@ const navGroups: NavGroup[] = [
       { path: '/admin/inventory/scan', label: 'Scan', icon: ScanLine },
       { path: '/admin/inventory/reports', label: 'Reports', icon: FileBarChart },
       { path: '/admin/products', label: 'Storefront Products', icon: Package },
+      { path: '/admin/stl-viewer', label: 'STL Viewer', icon: ImageIcon },
     ],
   },
   {
@@ -482,12 +483,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Main content */}
-      <main className="flex-1 min-h-screen overflow-y-auto">
-        <div className="max-w-5xl mx-auto p-6 lg:p-10">
-          {children}
-        </div>
-      </main>
+      {/* Main content. Full-bleed pages (e.g. STL viewer) opt out of the
+          max-width + padding wrapper so they can use the entire main area. */}
+      {(() => {
+        const fullBleedPaths = ['/admin/stl-viewer']
+        const isFullBleed = fullBleedPaths.some((p) => location.pathname === p)
+        return (
+          <main className={`flex-1 min-h-screen overflow-y-auto ${isFullBleed ? 'relative' : ''}`}>
+            {isFullBleed ? (
+              children
+            ) : (
+              <div className="max-w-5xl mx-auto p-6 lg:p-10">{children}</div>
+            )}
+          </main>
+        )
+      })()}
 
       {/* Global quote cart */}
       <QuoteCart />

@@ -1,15 +1,19 @@
 import { useState, useRef, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon, FileText, Boxes } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Package, Upload, Image as ImageIcon, Box, Link as LinkIcon, FileText, Boxes, Loader2 } from 'lucide-react'
 import { useContentStore } from '@/stores/contentStore'
 import { useQuoteCartStore } from '@/stores/quoteCartStore'
 import { useInventoryStore, type InventoryCategory } from '@/stores/inventoryStore'
-import type { Product } from '@/types'
+import { uploadProductModel } from '@/lib/storage'
+import type { Product, ProductFilament, ProductColor, ProductSpecs } from '@/types'
 
 type ProductForm = Omit<Product, 'id'>
 
 const emptyProduct: ProductForm = {
   name: '',
   nameGr: '',
+  slug: '',
+  collection: '',
+  seriesNo: undefined,
   category: 'fdm',
   material: 'PLA',
   price: 0,
@@ -17,8 +21,12 @@ const emptyProduct: ProductForm = {
   descriptionGr: '',
   badge: '',
   inStock: true,
+  shipsIn: '',
   modelUrl: '',
   imageUrl: '',
+  filaments: [],
+  colors: [],
+  specs: {},
 }
 
 function ImageUploader({
@@ -181,6 +189,289 @@ function ImageUploader({
   )
 }
 
+// ─────────────────────── ModelUploader ────────────────────────
+// Like ImageUploader but for STL/GLB/GLTF — uploads to Supabase Storage
+// instead of inlining as a data URL (STLs can be 10–20 MB).
+
+function ModelUploader({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (val: string) => void
+}) {
+  const [mode, setMode] = useState<'upload' | 'url'>(value && value.startsWith('http') ? 'url' : 'upload')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = async (file: File) => {
+    setError(null)
+    setUploading(true)
+    try {
+      const url = await uploadProductModel(file)
+      onChange(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block font-mono text-xs text-text-muted uppercase">3D Model (.stl / .glb)</label>
+        <div className="flex gap-1 text-[10px] font-mono">
+          <button
+            type="button"
+            onClick={() => setMode('upload')}
+            className={`px-2 py-1 rounded ${mode === 'upload' ? 'bg-accent-amber text-bg-primary' : 'text-text-muted'}`}
+          >Upload</button>
+          <button
+            type="button"
+            onClick={() => setMode('url')}
+            className={`px-2 py-1 rounded ${mode === 'url' ? 'bg-accent-amber text-bg-primary' : 'text-text-muted'}`}
+          >URL</button>
+        </div>
+      </div>
+
+      {mode === 'upload' ? (
+        <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-accent-amber/50 transition-colors cursor-pointer" onClick={() => fileRef.current?.click()}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".stl,.glb,.gltf"
+            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            className="hidden"
+          />
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2 text-accent-amber">
+              <Loader2 size={16} className="animate-spin" /> Uploading…
+            </div>
+          ) : value ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-text-primary truncate">
+                <Box size={14} className="text-accent-amber shrink-0" />
+                <span className="font-mono text-xs truncate">{value.split('/').pop()}</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChange('') }}
+                className="text-text-muted hover:text-red-400"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <div>
+              <Upload size={20} className="mx-auto text-text-muted mb-1" />
+              <p className="text-xs text-text-secondary">Click to upload an STL or GLB file</p>
+              <p className="text-[10px] text-text-muted font-mono mt-1">Stored in Supabase Storage · public CDN URL</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="input-field text-sm font-mono flex-1"
+            placeholder="https://example.com/model.stl"
+          />
+          {value && (
+            <button type="button" onClick={() => onChange('')} className="btn-outline text-xs px-3">Clear</button>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-[10px] text-red-400 font-mono mt-1">{error}</p>}
+    </div>
+  )
+}
+
+// ─────────────────────── FilamentsEditor ────────────────────────
+
+function FilamentsEditor({
+  value,
+  onChange,
+}: {
+  value: ProductFilament[]
+  onChange: (val: ProductFilament[]) => void
+}) {
+  return (
+    <div className="bg-bg-tertiary/40 border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block font-mono text-xs text-text-muted uppercase">Filament options</label>
+        <button
+          type="button"
+          onClick={() => onChange([...value, { name: '', extra_eur: 0 }])}
+          className="text-[11px] font-mono text-accent-amber hover:text-accent-amber/80 flex items-center gap-1"
+        >
+          <Plus size={11} /> Add filament
+        </button>
+      </div>
+      {value.length === 0 && (
+        <p className="text-[10px] text-text-muted font-mono">None — product will have no filament selector.</p>
+      )}
+      <div className="space-y-1.5">
+        {value.map((f, i) => (
+          <div key={i} className="grid grid-cols-[1fr_120px_30px] gap-2 items-center">
+            <input
+              value={f.name}
+              onChange={(e) => {
+                const next = [...value]; next[i] = { ...f, name: e.target.value }; onChange(next)
+              }}
+              placeholder="PLA"
+              className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:border-accent-amber focus:outline-none"
+            />
+            <div className="relative">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted text-[10px] font-mono">+€</span>
+              <input
+                type="number"
+                step="0.5"
+                value={f.extra_eur}
+                onChange={(e) => {
+                  const next = [...value]; next[i] = { ...f, extra_eur: parseFloat(e.target.value) || 0 }; onChange(next)
+                }}
+                className="w-full bg-bg-tertiary border border-border rounded pl-7 pr-2 py-1.5 text-xs font-mono text-right text-text-primary focus:border-accent-amber focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+              className="p-1 text-text-muted hover:text-red-400"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────── ColorsEditor ────────────────────────
+
+function ColorsEditor({
+  value,
+  onChange,
+}: {
+  value: ProductColor[]
+  onChange: (val: ProductColor[]) => void
+}) {
+  return (
+    <div className="bg-bg-tertiary/40 border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block font-mono text-xs text-text-muted uppercase">Color swatches</label>
+        <button
+          type="button"
+          onClick={() => onChange([...value, { hex: '#F59E0B', name: '' }])}
+          disabled={value.length >= 8}
+          className="text-[11px] font-mono text-accent-amber hover:text-accent-amber/80 flex items-center gap-1 disabled:opacity-40"
+        >
+          <Plus size={11} /> Add color
+        </button>
+      </div>
+      {value.length === 0 && (
+        <p className="text-[10px] text-text-muted font-mono">None — product will have no color picker.</p>
+      )}
+      <div className="space-y-1.5">
+        {value.map((c, i) => (
+          <div key={i} className="grid grid-cols-[40px_1fr_30px] gap-2 items-center">
+            <input
+              type="color"
+              value={c.hex}
+              onChange={(e) => {
+                const next = [...value]; next[i] = { ...c, hex: e.target.value }; onChange(next)
+              }}
+              className="w-full h-8 rounded cursor-pointer bg-transparent border border-border"
+            />
+            <input
+              value={c.name}
+              onChange={(e) => {
+                const next = [...value]; next[i] = { ...c, name: e.target.value }; onChange(next)
+              }}
+              placeholder="Axiom Amber"
+              className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:border-accent-amber focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+              className="p-1 text-text-muted hover:text-red-400"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────── SpecsEditor ────────────────────────
+
+function SpecsEditor({
+  value,
+  onChange,
+}: {
+  value: ProductSpecs
+  onChange: (val: ProductSpecs) => void
+}) {
+  const entries = Object.entries(value)
+  return (
+    <div className="bg-bg-tertiary/40 border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block font-mono text-xs text-text-muted uppercase">Specs (label → value)</label>
+        <button
+          type="button"
+          onClick={() => onChange({ ...value, '': '' })}
+          className="text-[11px] font-mono text-accent-amber hover:text-accent-amber/80 flex items-center gap-1"
+        >
+          <Plus size={11} /> Add row
+        </button>
+      </div>
+      {entries.length === 0 && (
+        <p className="text-[10px] text-text-muted font-mono">None — product page will hide the specs grid.</p>
+      )}
+      <div className="space-y-1.5">
+        {entries.map(([k, v], i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_30px] gap-2 items-center">
+            <input
+              value={k}
+              onChange={(e) => {
+                const next: ProductSpecs = {}
+                entries.forEach(([oldKey, oldVal], idx) => {
+                  next[idx === i ? e.target.value : oldKey] = oldVal
+                })
+                onChange(next)
+              }}
+              placeholder="dimensions_mm"
+              className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:border-accent-amber focus:outline-none"
+            />
+            <input
+              value={String(v)}
+              onChange={(e) => onChange({ ...value, [k]: e.target.value })}
+              placeholder="76 × 76 × 38"
+              className="bg-bg-tertiary border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:border-accent-amber focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const next = { ...value }; delete next[k]; onChange(next)
+              }}
+              className="p-1 text-text-muted hover:text-red-400"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ProductFormModal({
   initial,
   onSave,
@@ -258,19 +549,72 @@ function ProductFormModal({
             hint="JPG, PNG, WebP — recommended 800×800px"
           />
 
-          {/* 3D Model Upload */}
-          <ImageUploader
+          {/* 3D Model — STL or GLB. STLs upload to Supabase Storage instead
+              of inline data-URLs because they can be 10–20 MB. */}
+          <ModelUploader
             value={form.modelUrl || ''}
             onChange={(val) => setForm({ ...form, modelUrl: val })}
-            label="3D Model (.glb)"
-            accept=".glb,.gltf"
-            hint="GLB or GLTF — shown in 3D viewer on product card"
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Slug + Collection metadata */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Slug (URL)</label>
+              <input
+                value={form.slug || ''}
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                className="input-field text-sm font-mono"
+                placeholder="auto-from-name"
+              />
+              <p className="text-[10px] text-text-muted font-mono mt-1">Used in /p/&lt;slug&gt;. Leave empty to auto-generate.</p>
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Collection</label>
+              <input
+                value={form.collection || ''}
+                onChange={(e) => setForm({ ...form, collection: e.target.value })}
+                className="input-field text-sm"
+                placeholder="e.g. Topology Series"
+              />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Series #</label>
+              <input
+                type="number"
+                value={form.seriesNo ?? ''}
+                onChange={(e) => setForm({ ...form, seriesNo: e.target.value ? parseInt(e.target.value) : undefined })}
+                className="input-field text-sm font-mono"
+                placeholder="7"
+              />
+            </div>
+          </div>
+
+          {/* Filaments — variant pricing. */}
+          <FilamentsEditor
+            value={form.filaments || []}
+            onChange={(val) => setForm({ ...form, filaments: val })}
+          />
+
+          {/* Colors — 6 hex swatches max, drives the color picker on the page. */}
+          <ColorsEditor
+            value={form.colors || []}
+            onChange={(val) => setForm({ ...form, colors: val })}
+          />
+
+          {/* Specs — free-form key/value rows for the spec table. */}
+          <SpecsEditor
+            value={form.specs || {}}
+            onChange={(val) => setForm({ ...form, specs: val })}
+          />
+
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block font-mono text-xs text-text-muted uppercase mb-1">Badge (optional)</label>
-              <input value={form.badge || ''} onChange={(e) => setForm({ ...form, badge: e.target.value || undefined })} className="input-field" placeholder="e.g. Premium, Customizable" />
+              <input value={form.badge || ''} onChange={(e) => setForm({ ...form, badge: e.target.value || undefined })} className="input-field" placeholder="e.g. Premium" />
+            </div>
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">Ships in</label>
+              <input value={form.shipsIn || ''} onChange={(e) => setForm({ ...form, shipsIn: e.target.value || undefined })} className="input-field" placeholder="3–5 days" />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 cursor-pointer">
