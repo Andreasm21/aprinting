@@ -226,7 +226,7 @@ function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
     other: 'text-text-muted',
   }
   const Icon = KIND_ICON[n.kind] || Bell
-  const archiveQuote = useInvoicesStore((s) => s.updateInvoice)
+  const deleteInvoice = useInvoicesStore((s) => s.deleteInvoice)
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [archived, setArchived] = useState(false)
 
@@ -282,9 +282,12 @@ function AdminAlertDetail({ n }: { n: AdminAlertNotification }) {
         <DeleteConfirmModal
           quick
           verb="Archive"
-          label={`Public link for ${n.context.quoteNumber || n.context.quoteId}`}
+          label={`Public link for ${n.context.quoteNumber || n.context.quoteId} — the URL will return 'not found' after this.`}
           onConfirm={async () => {
-            archiveQuote(n.context!.quoteId!, { status: 'cancelled' })
+            // Hard-delete the quotation row so the public /quote/:id URL
+            // can't resolve anything. The Order keeps its history snapshot
+            // (quote number, accepted date, total) so the timeline stays.
+            deleteInvoice(n.context!.quoteId!)
             setArchived(true)
             setConfirmArchive(false)
           }}
