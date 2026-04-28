@@ -14,11 +14,13 @@
 //
 // Phase 4 adds RoomList rail; for now the rail is a header dropdown.
 
-import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, X, Users, Hash, ChevronDown, Plus, Bell, BellOff, MessageSquare, ListChecks, Copy, Send, Phone } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { MessageCircle, X, Users, Hash, ChevronDown, Plus, Bell, BellOff, MessageSquare, ListChecks, Copy, Send, Phone, ExternalLink } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
 import { useAdminChatStore } from '@/stores/adminChatStore'
 import { useAdminVoiceStore } from '@/stores/adminVoiceStore'
+import { useAdminClientChatStore } from '@/stores/adminClientChatStore'
 import { useAdminPresence } from '@/hooks/useAdminPresence'
 import { useGlobalChatRealtime, useRoomRealtime } from '@/hooks/useChatRealtime'
 import { useReadReceipts } from '@/hooks/useReadReceipts'
@@ -39,7 +41,7 @@ function initials(name: string): string {
   return name.split(' ').map((w) => w[0]).filter(Boolean).join('').toUpperCase().slice(0, 2)
 }
 
-type View = 'chat' | 'people'
+type View = 'chat' | 'people' | 'clients'
 
 export default function AdminChatBubble() {
   const currentUser = useAdminAuthStore((s) => s.currentUser)
@@ -134,6 +136,29 @@ export default function AdminChatBubble() {
 
   // Read-receipt observer — only marks while panel is open + chat view
   useReadReceipts(activeRoomId, bubbleOpen && view === 'chat')
+
+  // ─── Customer chats (visitor live chat) ───
+  const clientThreads = useAdminClientChatStore((s) => s.threads)
+  const clientMessagesByThread = useAdminClientChatStore((s) => s.messagesByThread)
+  const loadClientChats = useAdminClientChatStore((s) => s.load)
+  const hasLoadedClientChats = useAdminClientChatStore((s) => s.hasLoaded)
+  const setActiveClientThread = useAdminClientChatStore((s) => s.setActiveThread)
+  const activeClientThreadId = useAdminClientChatStore((s) => s.activeThreadId)
+  const sendClientReply = useAdminClientChatStore((s) => s.sendReply)
+  const clientUnread = useMemo(() => {
+    let total = 0
+    for (const t of clientThreads) {
+      const msgs = clientMessagesByThread.get(t.id) ?? []
+      for (const m of msgs) {
+        if (m.authorKind === 'visitor' && !m.readAt) total += 1
+      }
+    }
+    return total
+  }, [clientThreads, clientMessagesByThread])
+  useEffect(() => {
+    if (!hasLoadedClientChats) void loadClientChats()
+  }, [hasLoadedClientChats, loadClientChats])
+  const [clientReplyDraft, setClientReplyDraft] = useState('')
 
   // ─── Voice room (Phase D) ───
   const loadVoice = useAdminVoiceStore((s) => s.load)
@@ -260,6 +285,22 @@ export default function AdminChatBubble() {
                 >
                   <Users size={12} />
                   <span className="sr-only">{onlineCount} online</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView(view === 'clients' ? 'chat' : 'clients')}
+                  aria-label="Customer chats"
+                  className={`relative p-1 rounded transition-colors ${
+                    view === 'clients' ? 'text-accent-amber bg-accent-amber/10' : 'text-text-secondary hover:text-accent-amber'
+                  }`}
+                  title="Live chats from visitors"
+                >
+                  <MessageSquare size={12} />
+                  {clientUnread > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[12px] h-3 px-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
+                      {clientUnread > 9 ? '9+' : clientUnread}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -392,6 +433,74 @@ export default function AdminChatBubble() {
               </div>
             )}
 
+            {view === 'clients' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                {/* Sub-header */}
+                <div className="px-3 py-2 border-b border-border bg-bg-tertiary/30 flex items-center justify-between">
+                  <span className="text-[10px] uppercase text-text-muted tracking-wider">
+                    Customer chats · {clientThreads.filter((t) => t.status === 'open').length} open
+                  </span>
+                  <Link
+                    to="/admin/conversations"
+                    onClick={() => useAdminChatStore.getState().setBubbleOpen(false)}
+                    className="text-[10px] text-text-muted hover:text-accent-amber flex items-center gap-1"
+                  >
+                    Open page <ExternalLink size={9} />
+                  </Link>
+                </div>
+
+                {/* Thread list (compact) */}
+                {!activeClientThreadId ? (
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {clientThreads.length === 0 && (
+                      <div className="px-3 py-8 text-center text-text-muted text-xs">
+                        <p>No customer chats yet.</p>
+                        <p className="mt-1 text-[10px] opacity-70">When visitors open the live chat on the storefront, threads appear here.</p>
+                      </div>
+                    )}
+                    {clientThreads.slice(0, 20).map((t) => {
+                      const msgs = clientMessagesByThread.get(t.id) ?? []
+                      const last = msgs[msgs.length - 1]
+                      const unread = msgs.filter((m) => m.authorKind === 'visitor' && !m.readAt).length
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setActiveClientThread(t.id)}
+                          className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-bg-tertiary/60 text-left"
+                        >
+                          <div className="w-7 h-7 rounded-full bg-accent-amber/10 flex items-center justify-center text-accent-amber font-bold text-[10px] flex-shrink-0">
+                            {initials(t.visitorName)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <p className="text-text-primary text-xs font-bold truncate">{t.visitorName}</p>
+                              {unread > 0 && (
+                                <span className="bg-accent-amber text-bg-primary text-[9px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>
+                              )}
+                            </div>
+                            <p className="text-text-muted text-[10px] truncate">{last?.body ?? '—'}</p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <ClientThreadView
+                    threadId={activeClientThreadId}
+                    onBack={() => setActiveClientThread(null)}
+                    onSend={async (body) => {
+                      if (!body.trim() || !currentUser) return
+                      await sendClientReply(activeClientThreadId, currentUser.id, body)
+                      setClientReplyDraft('')
+                    }}
+                    draft={clientReplyDraft}
+                    setDraft={setClientReplyDraft}
+                  />
+                )}
+              </div>
+            )}
+
             {view === 'people' && (
               <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                 <div className="px-2 py-1.5 text-[10px] uppercase text-text-muted tracking-wider">
@@ -504,6 +613,99 @@ export default function AdminChatBubble() {
           onClose={() => setContextMenu(null)}
         />
       )}
+    </>
+  )
+}
+
+/** Compact reader + reply for one client chat inside the bubble. */
+function ClientThreadView({
+  threadId,
+  onBack,
+  onSend,
+  draft,
+  setDraft,
+}: {
+  threadId: string
+  onBack: () => void
+  onSend: (body: string) => Promise<void>
+  draft: string
+  setDraft: (v: string) => void
+}) {
+  const thread = useAdminClientChatStore((s) => s.threads.find((t) => t.id === threadId))
+  const messages = useAdminClientChatStore((s) => s.messagesByThread.get(threadId) ?? [])
+  const allUsers = useAdminAuthStore((s) => s.users)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages.length])
+
+  if (!thread) return null
+
+  return (
+    <>
+      <div className="px-3 py-2 border-b border-border bg-bg-tertiary/30 flex items-center justify-between gap-2">
+        <button type="button" onClick={onBack} className="text-text-muted hover:text-text-primary text-[10px] uppercase tracking-wider">
+          ← All
+        </button>
+        <div className="text-right min-w-0 flex-1">
+          <p className="text-text-primary text-xs font-bold truncate">{thread.visitorName}</p>
+          <p className="text-[9px] text-text-muted truncate">{thread.visitorEmail}</p>
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 font-mono">
+        {messages.map((m) => {
+          const isAdmin = m.authorKind === 'admin'
+          const isSystem = m.authorKind === 'system'
+          if (isSystem) return <div key={m.id} className="text-center text-text-muted text-[9px] italic">{m.body}</div>
+          const author = isAdmin ? allUsers.find((u) => u.id === m.authorId) : null
+          return (
+            <div key={m.id} className={`flex gap-2 ${isAdmin ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`max-w-[230px] min-w-0 ${isAdmin ? 'text-right' : 'text-left'}`}>
+                <div className={`inline-block px-2.5 py-1.5 rounded-2xl text-[11px] leading-relaxed break-words whitespace-pre-wrap ${
+                  isAdmin
+                    ? 'bg-accent-amber/15 text-text-primary rounded-tr-sm'
+                    : 'bg-bg-tertiary text-text-primary rounded-tl-sm'
+                }`}>
+                  {m.body}
+                </div>
+                <p className="text-[9px] text-text-muted mt-0.5 px-1">
+                  {isAdmin ? (author?.displayName ?? 'Admin') : thread.visitorName} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="border-t border-border p-2 bg-bg-tertiary/30">
+        <div className="flex items-end gap-1.5 bg-bg-tertiary rounded-lg border border-border focus-within:border-accent-amber transition-colors px-2 py-1.5">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void onSend(draft)
+              }
+            }}
+            rows={1}
+            placeholder="Quick reply…  (Enter to send)"
+            className="flex-1 bg-transparent resize-none outline-none text-text-primary text-xs leading-relaxed font-mono placeholder:text-text-muted/60 max-h-24 py-1"
+          />
+          <button
+            type="button"
+            onClick={() => void onSend(draft)}
+            disabled={!draft.trim()}
+            aria-label="Send reply"
+            className="text-accent-amber disabled:text-text-muted/40 disabled:cursor-not-allowed hover:scale-110 transition-transform p-1"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
     </>
   )
 }

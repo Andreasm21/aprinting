@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink,
@@ -10,6 +10,7 @@ import {
 import QuoteCart from './components/QuoteCart'
 import AdminChatBubble from './chat/AdminChatBubble'
 import { useAdminTasksStore } from '@/stores/adminTasksStore'
+import { useAdminClientChatStore } from '@/stores/adminClientChatStore'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
@@ -22,7 +23,7 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   exact?: boolean
-  badge?: 'notifications' | 'my-tasks'
+  badge?: 'notifications' | 'my-tasks' | 'client-chats'
   match?: (pathname: string) => boolean
 }
 
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
       { path: '/admin/notifications', label: 'Requests', icon: Bell, badge: 'notifications' },
+      { path: '/admin/conversations', label: 'Customer chats', icon: MessageSquare, badge: 'client-chats' },
       { path: '/admin/customers', label: 'Customers', icon: Users },
     ],
   },
@@ -125,6 +127,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const tasks = useAdminTasksStore((s) => s.tasks)
   const loadTasks = useAdminTasksStore((s) => s.load)
   const hasLoadedTasks = useAdminTasksStore((s) => s.hasLoaded)
+  const clientChats = useAdminClientChatStore((s) => s.threads)
+  const messagesByThread = useAdminClientChatStore((s) => s.messagesByThread)
+  const loadClientChats = useAdminClientChatStore((s) => s.load)
+  const hasLoadedClientChats = useAdminClientChatStore((s) => s.hasLoaded)
   const currentUser = useAdminAuthStore((s) => s.currentUser)
   const loading = useAdminAuthStore((s) => s.loading)
   const bootstrap = useAdminAuthStore((s) => s.bootstrap)
@@ -163,10 +169,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (currentUser && !hasLoadedTasks) void loadTasks()
   }, [currentUser, hasLoadedTasks, loadTasks])
+  useEffect(() => {
+    if (currentUser && !hasLoadedClientChats) void loadClientChats()
+  }, [currentUser, hasLoadedClientChats, loadClientChats])
 
   const myOpenTasks = currentUser
     ? tasks.filter((t) => t.assignedTo === currentUser.id && t.status !== 'done').length
     : 0
+
+  // Total unread visitor messages across all threads
+  const clientChatsUnread = useMemo(() => {
+    let total = 0
+    for (const t of clientChats) {
+      const msgs = messagesByThread.get(t.id) ?? []
+      for (const m of msgs) {
+        if (m.authorKind === 'visitor' && !m.readAt) total += 1
+      }
+    }
+    return total
+  }, [clientChats, messagesByThread])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -402,7 +423,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const groupOpen = openGroups[group.id] || groupHasActiveItem
             const groupUnreadCount =
               (group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0) +
-              (group.items.some((item) => item.badge === 'my-tasks') ? myOpenTasks : 0)
+              (group.items.some((item) => item.badge === 'my-tasks') ? myOpenTasks : 0) +
+              (group.items.some((item) => item.badge === 'client-chats') ? clientChatsUnread : 0)
             const GroupIcon = group.icon
             return (
               <div key={group.id}>
@@ -452,6 +474,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           {item.badge === 'my-tasks' && myOpenTasks > 0 && (
                             <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                               {myOpenTasks}
+                            </span>
+                          )}
+                          {item.badge === 'client-chats' && clientChatsUnread > 0 && (
+                            <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                              {clientChatsUnread}
                             </span>
                           )}
                         </Link>

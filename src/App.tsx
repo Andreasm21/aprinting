@@ -12,6 +12,7 @@ import About from '@/components/About'
 import CustomPartRequest from '@/components/CustomPartRequest'
 import FindYourOrder from '@/components/FindYourOrder'
 import Footer from '@/components/Footer'
+import LiveChatWidget from '@/components/LiveChatWidget'
 import Cart from '@/components/Cart'
 import Checkout from '@/components/Checkout'
 import { useVisitorTracking } from '@/hooks/useVisitorTracking'
@@ -49,6 +50,7 @@ const PublicOrderTracking = lazy(() => import('@/public/PublicOrderTracking'))
 const AdminStlViewer = lazy(() => import('@/admin/AdminStlViewer'))
 const AdminTasks = lazy(() => import('@/admin/AdminTasks'))
 const AdminFiles = lazy(() => import('@/admin/AdminFiles'))
+const AdminConversations = lazy(() => import('@/admin/AdminConversations'))
 const ProductPage = lazy(() => import('@/pages/ProductPage'))
 
 // Portal (customer-facing)
@@ -98,6 +100,7 @@ function SitePage() {
       <Footer />
       <Cart />
       <Checkout />
+      <LiveChatWidget />
     </>
   )
 }
@@ -146,6 +149,8 @@ function App() {
         <Route path="/admin/tasks" element={<AdminLoader><AdminTasks /></AdminLoader>} />
         {/* Admin shared files */}
         <Route path="/admin/files" element={<AdminLoader><AdminFiles /></AdminLoader>} />
+        {/* Customer chats from the public live-chat widget */}
+        <Route path="/admin/conversations" element={<AdminLoader><AdminConversations /></AdminLoader>} />
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />

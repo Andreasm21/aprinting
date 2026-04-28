@@ -11,6 +11,7 @@ import { useContentStore } from '@/stores/contentStore'
 import { useCartStore } from '@/stores/cartStore'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import LiveChatWidget from '@/components/LiveChatWidget'
 import FilamentPills from '@/components/ui/FilamentPills'
 import ColorSwatchRow from '@/components/ui/ColorSwatchRow'
 import QtyStepper from '@/components/ui/QtyStepper'
@@ -317,6 +318,7 @@ export default function ProductPage() {
       </div>
 
       <Footer />
+      <LiveChatWidget />
     </div>
   )
 }
