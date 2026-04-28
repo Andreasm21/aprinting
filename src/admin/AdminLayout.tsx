@@ -5,6 +5,7 @@ import {
   Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, LogOut, Boxes,
   UserCog, History, ClipboardList, ChevronDown, Inbox, Printer, Receipt,
   ArrowLeftRight, Truck, ScanLine, FileBarChart, Image as ImageIcon, ListChecks,
+  Folder,
 } from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
 import AdminChatBubble from './chat/AdminChatBubble'
@@ -105,6 +106,7 @@ const navGroups: NavGroup[] = [
     icon: UserCog,
     items: [
       { path: '/admin/team', label: 'Team', icon: UserCog },
+      { path: '/admin/files', label: 'Files', icon: Folder },
       { path: '/admin/activity', label: 'Activity Log', icon: History },
     ],
   },

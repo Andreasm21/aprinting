@@ -48,6 +48,7 @@ const PublicQuoteView = lazy(() => import('@/public/PublicQuoteView'))
 const PublicOrderTracking = lazy(() => import('@/public/PublicOrderTracking'))
 const AdminStlViewer = lazy(() => import('@/admin/AdminStlViewer'))
 const AdminTasks = lazy(() => import('@/admin/AdminTasks'))
+const AdminFiles = lazy(() => import('@/admin/AdminFiles'))
 const ProductPage = lazy(() => import('@/pages/ProductPage'))
 
 // Portal (customer-facing)
@@ -143,6 +144,8 @@ function App() {
         <Route path="/admin/stl-viewer" element={<AdminLoader><AdminStlViewer /></AdminLoader>} />
         {/* Admin tasks (kanban) */}
         <Route path="/admin/tasks" element={<AdminLoader><AdminTasks /></AdminLoader>} />
+        {/* Admin shared files */}
+        <Route path="/admin/files" element={<AdminLoader><AdminFiles /></AdminLoader>} />
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
