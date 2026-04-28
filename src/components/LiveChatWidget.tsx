@@ -12,7 +12,7 @@
 // to the same thread.
 
 import { useEffect, useRef, useState } from 'react'
-import { MessageCircle, X, Send } from 'lucide-react'
+import { MessageCircle, X, Send, Lock, Plus } from 'lucide-react'
 import { useClientChatStore } from '@/stores/clientChatStore'
 
 function initials(name: string): string {
@@ -30,6 +30,7 @@ export default function LiveChatWidget() {
   const bootstrap = useClientChatStore((s) => s.bootstrap)
   const startThread = useClientChatStore((s) => s.startThread)
   const sendMessage = useClientChatStore((s) => s.sendMessage)
+  const resetThread = useClientChatStore((s) => s.resetThread)
   const messages = useClientChatStore((s) => s.messages)
   const thread = useClientChatStore((s) => s.thread)
   const visitorName = useClientChatStore((s) => s.visitorName)
@@ -37,6 +38,8 @@ export default function LiveChatWidget() {
   const loading = useClientChatStore((s) => s.loading)
   const error = useClientChatStore((s) => s.error)
   const unreadAdminCount = useClientChatStore((s) => s.unreadAdminCount())
+
+  const isClosed = thread?.status === 'closed'
 
   // Gating form state
   const [formName, setFormName] = useState('')
@@ -99,11 +102,22 @@ export default function LiveChatWidget() {
           {/* Header */}
           <div className="px-4 py-3 border-b border-border bg-bg-tertiary/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className={`w-2 h-2 rounded-full ${
+                isClosed ? 'bg-text-muted' : 'bg-emerald-400 animate-pulse'
+              }`} />
               <div>
-                <p className="text-text-primary font-bold">Chat with Axiom</p>
+                <p className="text-text-primary font-bold flex items-center gap-1.5">
+                  Chat with Axiom
+                  {isClosed && (
+                    <span className="text-[9px] uppercase tracking-wider text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded">
+                      Closed
+                    </span>
+                  )}
+                </p>
                 <p className="text-text-muted text-[10px]">
-                  {thread ? 'We typically reply within an hour' : 'Send us a message — we\'ll reply ASAP'}
+                  {isClosed
+                    ? 'This conversation has been closed'
+                    : thread ? 'We typically reply within an hour' : 'Send us a message — we\'ll reply ASAP'}
                 </p>
               </div>
             </div>
@@ -205,29 +219,45 @@ export default function LiveChatWidget() {
                 })}
               </div>
 
-              {/* Composer */}
-              <div className="border-t border-border bg-bg-tertiary/30 p-2">
-                <div className="flex items-end gap-1.5 bg-bg-tertiary rounded-lg border border-border focus-within:border-accent-amber transition-colors px-2 py-1.5">
-                  <textarea
-                    ref={taRef}
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                    placeholder="Type a message…"
-                    className="flex-1 bg-transparent resize-none outline-none text-text-primary text-xs leading-relaxed font-mono placeholder:text-text-muted/60 max-h-24 py-1"
-                  />
+              {/* Composer OR closed-banner */}
+              {isClosed ? (
+                <div className="border-t border-border bg-bg-tertiary/30 p-3 text-center">
+                  <p className="text-text-secondary text-[11px] mb-2 flex items-center justify-center gap-1.5 font-mono">
+                    <Lock size={11} className="text-text-muted" />
+                    This chat was closed by the team.
+                  </p>
                   <button
                     type="button"
-                    onClick={() => void handleSend()}
-                    disabled={!body.trim()}
-                    aria-label="Send message"
-                    className="text-accent-amber disabled:text-text-muted/40 disabled:cursor-not-allowed hover:scale-110 transition-transform p-1"
+                    onClick={resetThread}
+                    className="inline-flex items-center gap-1.5 bg-accent-amber text-bg-primary font-bold text-[11px] px-3 py-1.5 rounded hover:bg-accent-amber/90 transition-colors"
                   >
-                    <Send size={16} />
+                    <Plus size={12} /> Start a new chat
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="border-t border-border bg-bg-tertiary/30 p-2">
+                  <div className="flex items-end gap-1.5 bg-bg-tertiary rounded-lg border border-border focus-within:border-accent-amber transition-colors px-2 py-1.5">
+                    <textarea
+                      ref={taRef}
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      rows={1}
+                      placeholder="Type a message…"
+                      className="flex-1 bg-transparent resize-none outline-none text-text-primary text-xs leading-relaxed font-mono placeholder:text-text-muted/60 max-h-24 py-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleSend()}
+                      disabled={!body.trim()}
+                      aria-label="Send message"
+                      className="text-accent-amber disabled:text-text-muted/40 disabled:cursor-not-allowed hover:scale-110 transition-transform p-1"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

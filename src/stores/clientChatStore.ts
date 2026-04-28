@@ -115,6 +115,9 @@ interface ClientChatState {
   toggleOpen: () => void
   startThread: (name: string, email: string, firstMessage: string) => Promise<void>
   sendMessage: (body: string) => Promise<void>
+  /** Drop the current closed thread so the visitor can open a fresh one.
+   *  Keeps the name/email in localStorage so the gating form pre-fills. */
+  resetThread: () => void
   /** Mark every admin message as read by this visitor. */
   markAdminMessagesRead: () => Promise<void>
 
@@ -324,6 +327,16 @@ export const useClientChatStore = create<ClientChatState>((set, get) => ({
     } catch (err) {
       console.error('[client_chat] sendMessage:', err)
     }
+  },
+
+  resetThread: () => {
+    // Tear down the realtime subscription pinned to the old thread.
+    if (_channel) {
+      void supabase.removeChannel(_channel).catch(() => {})
+      _channel = null
+    }
+    writeLocal(THREAD_ID_KEY, '')
+    set({ threadId: null, thread: null, messages: [], error: null })
   },
 
   markAdminMessagesRead: async () => {
