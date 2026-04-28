@@ -3,6 +3,7 @@ import { ShoppingCart, Menu, X, Globe } from 'lucide-react'
 import { useCartStore } from '@/stores/cartStore'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/hooks/useTranslation'
+import BrandLogo from '@/components/BrandLogo'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -45,13 +46,8 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
-            <a href="#hero" onClick={() => scrollTo('#hero')} className="flex items-baseline gap-0 cursor-pointer">
-              <span className="font-mono text-xl md:text-2xl font-bold text-accent-amber tracking-tight">
-                A
-              </span>
-              <span className="font-mono text-xl md:text-2xl font-bold text-text-primary tracking-tight">
-                xiom
-              </span>
+            <a href="#hero" onClick={() => scrollTo('#hero')} className="flex items-center cursor-pointer" aria-label="Axiom home">
+              <BrandLogo size="sm" markClassName="h-10 w-10 md:h-11 md:w-11" textClassName="text-xl md:text-2xl" />
             </a>
 
             {/* Desktop nav */}

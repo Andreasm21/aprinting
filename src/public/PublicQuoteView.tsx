@@ -13,6 +13,7 @@ import { useInvoicesStore, type Invoice } from '@/stores/invoicesStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useCustomersStore } from '@/stores/customersStore'
 import { elementToPdfBase64 } from '@/lib/emailClient'
+import BrandLogo, { AXIOM_FAVICON_SRC } from '@/components/BrandLogo'
 
 const FILAMENT_KINDS = ['PLA', 'PETG', 'ABS', 'TPU', 'Resin', 'Nylon']
 function filamentKindOnly(material: string): string {
@@ -347,8 +348,8 @@ function PageShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="border-b border-border bg-bg-secondary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link to="/" className="font-mono text-2xl font-bold flex items-baseline">
-            <span className="text-accent-amber">A</span><span>xiom</span>
+          <Link to="/" className="flex items-center" aria-label="Axiom home">
+            <BrandLogo size="sm" />
           </Link>
           <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted flex items-center gap-1">
             <Lock size={10} /> Secure quote view
@@ -400,9 +401,9 @@ const PrintableQuote = React.forwardRef<HTMLDivElement, { doc: Invoice }>(functi
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <div className="flex items-baseline gap-0">
-              <span className="text-2xl font-bold" style={{ color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>A</span>
-              <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>xiom</span>
+            <div className="flex items-center gap-3">
+              <img src={AXIOM_FAVICON_SRC} alt="" className="h-12 w-12 object-contain" />
+              <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Axiom</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">Professional 3D Printing Services</p>
             <p className="text-xs text-gray-500">team@axiomcreate.com</p>

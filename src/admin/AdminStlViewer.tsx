@@ -12,6 +12,7 @@ import { parseSTL } from '@/components/viewer/parseSTL'
 import { captureFiveShots, downloadShots, type CaptureShot } from '@/components/viewer/captureRig'
 import ViewerControls, { type ModelFinish } from '@/components/viewer/ViewerControls'
 import AdvancedRotationPanel, { AdvancedRotationToggle } from '@/components/viewer/AdvancedRotationPanel'
+import BrandLogo from '@/components/BrandLogo'
 
 interface FileInfo {
   name: string
@@ -219,9 +220,8 @@ export default function AdminStlViewer() {
 
       {/* Header bar */}
       <div className="absolute top-0 inset-x-0 z-20 px-6 py-4 flex items-center justify-between bg-gradient-to-b from-bg-primary/90 to-transparent">
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-mono font-bold text-accent-amber">A</span>
-          <span className="text-2xl font-mono font-bold">xiom</span>
+        <div className="flex items-center gap-1">
+          <BrandLogo size="sm" />
           <span className="ml-3 text-[10px] font-mono uppercase tracking-widest text-text-muted">STL Viewer</span>
         </div>
         <div className="flex items-center gap-2">

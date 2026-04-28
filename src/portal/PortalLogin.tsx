@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Lock } from 'lucide-react'
 import { usePortalAuthStore } from '@/stores/portalAuthStore'
+import BrandLogo from '@/components/BrandLogo'
 
 export default function PortalLogin() {
   const login = usePortalAuthStore((s) => s.login)
@@ -26,15 +26,10 @@ export default function PortalLogin() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm">
         <div className="card-base p-8">
           <div className="flex items-center justify-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
-              <Lock size={24} className="text-accent-amber" />
-            </div>
+            <BrandLogo size="lg" showWordmark={false} />
           </div>
           <div className="text-center mb-6">
-            <div className="flex items-baseline justify-center gap-0 mb-1">
-              <span className="font-mono text-xl font-bold text-accent-amber">A</span>
-              <span className="font-mono text-xl font-bold text-text-primary">xiom</span>
-            </div>
+            <BrandLogo size="sm" className="justify-center mb-1" markClassName="hidden" />
             <p className="text-text-muted text-xs font-mono">Customer Portal</p>
           </div>
           <div className="space-y-4">

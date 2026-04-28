@@ -11,6 +11,7 @@ import {
 import { useOrdersStore, ORDER_STATUS_LABEL, type OrderStatus, type OrderEvent } from '@/stores/ordersStore'
 import { useInvoicesStore } from '@/stores/invoicesStore'
 import { elementToPdfBase64 } from '@/lib/emailClient'
+import BrandLogo, { AXIOM_FAVICON_SRC } from '@/components/BrandLogo'
 
 const STATUS_ICON: Record<OrderStatus, typeof Package> = {
   pending: Clock,
@@ -250,9 +251,9 @@ export default function PublicOrderTracking() {
           <div ref={printableRef} className="bg-white rounded-lg max-w-3xl w-full mx-auto p-8 text-gray-900" style={{ fontFamily: "'Inter', sans-serif" }}>
             <div className="flex justify-between items-start mb-8">
               <div>
-                <div className="flex items-baseline gap-0">
-                  <span className="text-2xl font-bold" style={{ color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>A</span>
-                  <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>xiom</span>
+                <div className="flex items-center gap-3">
+                  <img src={AXIOM_FAVICON_SRC} alt="" className="h-12 w-12 object-contain" />
+                  <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Axiom</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Professional 3D Printing Services</p>
                 <p className="text-xs text-gray-500">team@axiomcreate.com</p>
@@ -293,8 +294,8 @@ function PageShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="border-b border-border bg-bg-secondary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link to="/" className="font-mono text-2xl font-bold flex items-baseline">
-            <span className="text-accent-amber">A</span><span>xiom</span>
+          <Link to="/" className="flex items-center" aria-label="Axiom home">
+            <BrandLogo size="sm" />
           </Link>
           <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted flex items-center gap-1">
             <Lock size={10} /> Secure tracking

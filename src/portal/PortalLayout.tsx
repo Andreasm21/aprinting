@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, FileText, ShoppingCart, User, LogOut, Menu, X, Package } from 'lucide-react'
 import { usePortalAuthStore } from '@/stores/portalAuthStore'
 import PortalLogin from './PortalLogin'
+import BrandLogo from '@/components/BrandLogo'
 
 const navItems = [
   { path: '/portal', label: 'Dashboard', icon: LayoutDashboard },
@@ -51,11 +52,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       }`}>
         {/* Header */}
         <div className="p-5 border-b border-border">
-          <div className="flex items-baseline gap-0">
-            <span className="font-mono text-lg font-bold text-accent-amber">A</span>
-            <span className="font-mono text-lg font-bold text-text-primary">xiom</span>
-          </div>
-          <p className="text-text-muted text-xs font-mono mt-1">Customer Portal</p>
+          <BrandLogo size="xs" subtitle="Customer Portal" />
         </div>
 
         {/* Customer info */}

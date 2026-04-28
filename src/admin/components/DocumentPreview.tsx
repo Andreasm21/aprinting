@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Printer, Download, Mail } from 'lucide-react'
 import type { Invoice } from '@/stores/invoicesStore'
 import { useContentStore } from '@/stores/contentStore'
+import { AXIOM_FAVICON_SRC } from '@/components/BrandLogo'
 import SendEmailModal from './SendEmailModal'
 
 interface Props {
@@ -153,9 +154,9 @@ export default function DocumentPreview({ doc, onClose, autoDownload }: Props) {
           {/* Header */}
           <div className="flex justify-between items-start mb-8">
             <div>
-              <div className="flex items-baseline gap-0">
-                <span className="text-2xl font-bold" style={{ color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>A</span>
-                <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>xiom</span>
+              <div className="flex items-center gap-3">
+                <img src={AXIOM_FAVICON_SRC} alt="" className="h-12 w-12 object-contain" />
+                <span className="text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Axiom</span>
               </div>
               <p className="text-xs text-gray-500 mt-1">Professional 3D Printing Services</p>
               <p className="text-xs text-gray-500">{contact.location}</p>

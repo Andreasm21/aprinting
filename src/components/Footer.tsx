@@ -1,5 +1,6 @@
 import { Camera, ThumbsUp } from 'lucide-react'
 import { useTranslation } from '@/hooks/useTranslation'
+import BrandLogo from '@/components/BrandLogo'
 
 export default function Footer() {
   const t = useTranslation()
@@ -23,10 +24,7 @@ export default function Footer() {
         <div className="grid md:grid-cols-3 gap-8 mb-10">
           {/* Logo + tagline */}
           <div>
-            <div className="flex items-baseline gap-0 mb-2">
-              <span className="font-mono text-xl font-bold text-accent-amber">A</span>
-              <span className="font-mono text-xl font-bold text-text-primary">xiom</span>
-            </div>
+            <BrandLogo size="sm" className="mb-2" />
             <p className="text-text-secondary text-sm">{t.footer.tagline}</p>
           </div>
 

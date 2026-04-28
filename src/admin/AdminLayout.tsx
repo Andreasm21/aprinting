@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink,
-  Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, Lock, LogOut, Boxes,
+  Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, LogOut, Boxes,
   UserCog, History, ClipboardList, ChevronDown, Inbox, Printer, Receipt,
   ArrowLeftRight, Truck, ScanLine, FileBarChart, Image as ImageIcon,
 } from 'lucide-react'
@@ -11,6 +11,7 @@ import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
 import { useAuditLogStore } from '@/stores/auditLogStore'
+import BrandLogo from '@/components/BrandLogo'
 import bcrypt from 'bcryptjs'
 
 type NavItem = {
@@ -184,7 +185,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (loading) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <p className="font-mono text-text-muted text-xs">[ INITIALIZING ADMIN ]</p>
+        <div className="flex flex-col items-center gap-4">
+          <BrandLogo size="lg" showWordmark={false} decorative markClassName="animate-pulse" />
+          <p className="font-mono text-text-muted text-xs">[ INITIALIZING ADMIN ]</p>
+        </div>
       </div>
     )
   }
@@ -195,15 +199,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <form onSubmit={handleLogin} className="w-full max-w-sm">
           <div className="card-base p-8">
             <div className="flex items-center justify-center mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
-                <Lock size={24} className="text-accent-amber" />
-              </div>
+              <BrandLogo size="lg" showWordmark={false} />
             </div>
             <div className="text-center mb-6">
-              <div className="flex items-baseline justify-center gap-0 mb-1">
-                <span className="font-mono text-xl font-bold text-accent-amber">A</span>
-                <span className="font-mono text-xl font-bold text-text-primary">xiom</span>
-              </div>
+              <BrandLogo size="sm" className="justify-center mb-1" markClassName="hidden" />
               <p className="text-text-muted text-xs font-mono">Admin Panel</p>
             </div>
             <div className="space-y-4">
@@ -283,9 +282,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <form onSubmit={handleForcedChange} className="w-full max-w-sm">
           <div className="card-base p-8">
             <div className="flex items-center justify-center mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
-                <Lock size={24} className="text-accent-amber" />
-              </div>
+              <BrandLogo size="lg" showWordmark={false} />
             </div>
             <div className="text-center mb-6">
               <h2 className="font-mono text-base font-bold text-text-primary">Set Your Password</h2>
@@ -365,10 +362,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }`}>
         {/* Header */}
         <div className="p-5 border-b border-border">
-          <div className="flex items-baseline gap-0">
-            <span className="font-mono text-lg font-bold text-accent-amber">A</span>
-            <span className="font-mono text-lg font-bold text-text-primary">xiom</span>
-          </div>
+          <BrandLogo size="xs" subtitle="Admin Panel" />
           {currentUser && (
             <div className="mt-2 flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-accent-amber/10 flex items-center justify-center">

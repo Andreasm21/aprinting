@@ -2,6 +2,7 @@ import { useTranslation } from '@/hooks/useTranslation'
 import { useContentStore } from '@/stores/contentStore'
 import { useAppStore } from '@/stores/appStore'
 import { Printer, Zap, Truck } from 'lucide-react'
+import BrandLogo from '@/components/BrandLogo'
 
 function PrinterAnimation() {
   return (
@@ -84,6 +85,14 @@ export default function Hero() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left — text */}
           <div className="text-center lg:text-left">
+            <div className="mb-6 flex justify-center lg:justify-start">
+              <BrandLogo
+                size="xl"
+                showWordmark={false}
+                decorative
+                markClassName="h-24 w-24 md:h-28 md:w-28"
+              />
+            </div>
             <h1 className="font-mono text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-4">
               <span className="text-text-primary">{t.hero.headline}</span>
               <span className="text-gradient-amber">{t.hero.headlineAccent}</span>
