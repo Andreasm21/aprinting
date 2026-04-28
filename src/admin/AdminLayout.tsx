@@ -4,9 +4,11 @@ import {
   Package, FileText, DollarSign, Info, MessageSquare, RotateCcw, ExternalLink,
   Menu, X, LayoutDashboard, Bell, Users, Mail, BarChart3, LogOut, Boxes,
   UserCog, History, ClipboardList, ChevronDown, Inbox, Printer, Receipt,
-  ArrowLeftRight, Truck, ScanLine, FileBarChart, Image as ImageIcon,
+  ArrowLeftRight, Truck, ScanLine, FileBarChart, Image as ImageIcon, ListChecks,
 } from 'lucide-react'
 import QuoteCart from './components/QuoteCart'
+import AdminChatBubble from './chat/AdminChatBubble'
+import { useAdminTasksStore } from '@/stores/adminTasksStore'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
@@ -19,7 +21,7 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   exact?: boolean
-  badge?: 'notifications'
+  badge?: 'notifications' | 'my-tasks'
   match?: (pathname: string) => boolean
 }
 
@@ -58,6 +60,7 @@ const navGroups: NavGroup[] = [
       { path: '/admin/orders/quotations', label: 'Quotations', icon: FileText },
       { path: '/admin/orders/print', label: 'Print', icon: Printer },
       { path: '/admin/orders/invoices', label: 'Payment', icon: Receipt },
+      { path: '/admin/tasks', label: 'Tasks', icon: ListChecks, badge: 'my-tasks' },
     ],
   },
   {
@@ -117,6 +120,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const location = useLocation()
   const resetAll = useContentStore((s) => s.resetAll)
   const unreadCount = useNotificationsStore((s) => s.getUnreadCount())
+  const tasks = useAdminTasksStore((s) => s.tasks)
+  const loadTasks = useAdminTasksStore((s) => s.load)
+  const hasLoadedTasks = useAdminTasksStore((s) => s.hasLoaded)
   const currentUser = useAdminAuthStore((s) => s.currentUser)
   const loading = useAdminAuthStore((s) => s.loading)
   const bootstrap = useAdminAuthStore((s) => s.bootstrap)
@@ -150,6 +156,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       await restoreSession()
     })()
   }, [bootstrap, restoreSession])
+
+  // Lazy-load tasks once a user is signed in so the sidebar badge populates.
+  useEffect(() => {
+    if (currentUser && !hasLoadedTasks) void loadTasks()
+  }, [currentUser, hasLoadedTasks, loadTasks])
+
+  const myOpenTasks = currentUser
+    ? tasks.filter((t) => t.assignedTo === currentUser.id && t.status !== 'done').length
+    : 0
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -383,7 +398,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {navGroups.map((group) => {
             const groupHasActiveItem = group.items.some((item) => isNavItemActive(location.pathname, item))
             const groupOpen = openGroups[group.id] || groupHasActiveItem
-            const groupUnreadCount = group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0
+            const groupUnreadCount =
+              (group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0) +
+              (group.items.some((item) => item.badge === 'my-tasks') ? myOpenTasks : 0)
             const GroupIcon = group.icon
             return (
               <div key={group.id}>
@@ -428,6 +445,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           {item.badge === 'notifications' && unreadCount > 0 && (
                             <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                               {unreadCount}
+                            </span>
+                          )}
+                          {item.badge === 'my-tasks' && myOpenTasks > 0 && (
+                            <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                              {myOpenTasks}
                             </span>
                           )}
                         </Link>
@@ -495,6 +517,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Global quote cart */}
       <QuoteCart />
+
+      {/* Floating admin-only chat bubble (presence + chat) */}
+      <AdminChatBubble />
     </div>
   )
 }

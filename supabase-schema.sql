@@ -318,3 +318,70 @@ create policy "anon_all" on site_content for all using (true) with check (true);
 
 drop policy if exists "anon_all" on storefront_products;
 create policy "anon_all" on storefront_products for all using (true) with check (true);
+
+-- ============================================================
+-- 13. ADMIN_CHAT_*  (backs src/stores/adminChatStore.ts)
+-- Channels + DMs, per-message read receipts, presence, typing, mentions.
+-- Apply via supabase/migrations/20260428_admin_chat.sql in the SQL editor.
+-- ============================================================
+create table if not exists admin_chat_rooms (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null check (kind in ('channel','dm')),
+  name        text,
+  topic       text,
+  created_by  text not null references admin_users(id),
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists admin_chat_room_members (
+  room_id     uuid references admin_chat_rooms(id) on delete cascade,
+  user_id     text references admin_users(id)     on delete cascade,
+  joined_at   timestamptz not null default now(),
+  primary key (room_id, user_id)
+);
+
+create table if not exists admin_chat_messages (
+  id          uuid primary key default gen_random_uuid(),
+  room_id     uuid not null references admin_chat_rooms(id) on delete cascade,
+  author_id   text not null references admin_users(id),
+  body        text not null,
+  mentions    text[] not null default '{}',
+  reply_to_id uuid references admin_chat_messages(id),
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists admin_chat_message_reads (
+  message_id  uuid references admin_chat_messages(id) on delete cascade,
+  user_id     text references admin_users(id)         on delete cascade,
+  read_at     timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create table if not exists admin_chat_room_state (
+  room_id              uuid references admin_chat_rooms(id) on delete cascade,
+  user_id              text references admin_users(id)     on delete cascade,
+  last_read_message_id uuid references admin_chat_messages(id),
+  muted_until          timestamptz,
+  primary key (room_id, user_id)
+);
+
+create index if not exists idx_chat_messages_room_time on admin_chat_messages(room_id, created_at desc);
+create index if not exists idx_chat_message_reads_user on admin_chat_message_reads(user_id);
+create index if not exists idx_chat_room_members_user  on admin_chat_room_members(user_id);
+
+alter table admin_chat_rooms          enable row level security;
+alter table admin_chat_room_members   enable row level security;
+alter table admin_chat_messages       enable row level security;
+alter table admin_chat_message_reads  enable row level security;
+alter table admin_chat_room_state     enable row level security;
+
+drop policy if exists "anon_all" on admin_chat_rooms;
+create policy "anon_all" on admin_chat_rooms          for all using (true) with check (true);
+drop policy if exists "anon_all" on admin_chat_room_members;
+create policy "anon_all" on admin_chat_room_members   for all using (true) with check (true);
+drop policy if exists "anon_all" on admin_chat_messages;
+create policy "anon_all" on admin_chat_messages       for all using (true) with check (true);
+drop policy if exists "anon_all" on admin_chat_message_reads;
+create policy "anon_all" on admin_chat_message_reads  for all using (true) with check (true);
+drop policy if exists "anon_all" on admin_chat_room_state;
+create policy "anon_all" on admin_chat_room_state     for all using (true) with check (true);
