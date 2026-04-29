@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuditLogStore } from './auditLogStore'
+import {
+  notifyAdminsOfOrder,
+  notifyAdminsOfPartRequest,
+  notifyAdminsOfContact,
+  notifyAdminsOfAlert,
+} from '@/lib/adminNotifier'
 
 export type NotificationType = 'order' | 'part_request' | 'contact' | 'admin_alert'
 
@@ -252,6 +258,8 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       set((state) => ({ notifications: [notification, ...state.notifications] }))
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New order received`, `€${notification.total.toFixed(2)} — ${notification.customer.name}`)
+      // Don't block the UI on the email — fire-and-forget
+      void notifyAdminsOfOrder(notification).catch((err) => console.warn('[notifications] email:', err))
     },
 
     addPartRequest: async (request) => {
@@ -265,6 +273,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       set((state) => ({ notifications: [notification, ...state.notifications] }))
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New part request received`, `${notification.details.partName} — ${notification.business.contactName}`)
+      void notifyAdminsOfPartRequest(notification).catch((err) => console.warn('[notifications] email:', err))
     },
 
     addContact: async (contact) => {
@@ -278,6 +287,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       set((state) => ({ notifications: [notification, ...state.notifications] }))
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New contact message`, `From ${notification.name}`)
+      void notifyAdminsOfContact(notification).catch((err) => console.warn('[notifications] email:', err))
     },
 
     addAdminAlert: async (alert) => {
@@ -291,6 +301,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       set((state) => ({ notifications: [notification, ...state.notifications] }))
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', notification.title, notification.message)
+      void notifyAdminsOfAlert(notification).catch((err) => console.warn('[notifications] email:', err))
       return notification.id
     },
 

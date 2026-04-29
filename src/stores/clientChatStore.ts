@@ -7,7 +7,7 @@
 
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
-import { notifyAdminsOfNewMessage } from '@/lib/clientChatNotifier'
+import { notifyAdminsOfChatMessage } from '@/lib/adminNotifier'
 
 const VISITOR_ID_KEY = 'axiom-visitor-id'
 const THREAD_ID_KEY = 'axiom-visitor-thread-id'
@@ -273,7 +273,7 @@ export const useClientChatStore = create<ClientChatState>((set, get) => ({
       subscribeToThread(thread.id)
 
       // Fire admin notification (don't block UI on the email)
-      void notifyAdminsOfNewMessage(thread, trimmedMsg, true).catch((err) => {
+      void notifyAdminsOfChatMessage(thread, trimmedMsg, true).catch((err) => {
         console.warn('[client_chat] notifyAdmins:', err)
       })
     } catch (err) {
@@ -321,7 +321,7 @@ export const useClientChatStore = create<ClientChatState>((set, get) => ({
         .eq('id', threadId)
 
       // Maybe notify admins (with built-in debounce)
-      void notifyAdminsOfNewMessage(thread, trimmed, false).catch((err) => {
+      void notifyAdminsOfChatMessage(thread, trimmed, false).catch((err) => {
         console.warn('[client_chat] notifyAdmins:', err)
       })
     } catch (err) {
