@@ -8,6 +8,7 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { notifyAdminsOfChatMessage } from '@/lib/adminNotifier'
+import { createLeadFromChat } from '@/lib/leadCreator'
 
 const VISITOR_ID_KEY = 'axiom-visitor-id'
 const THREAD_ID_KEY = 'axiom-visitor-thread-id'
@@ -275,6 +276,9 @@ export const useClientChatStore = create<ClientChatState>((set, get) => ({
       // Fire admin notification (don't block UI on the email)
       void notifyAdminsOfChatMessage(thread, trimmedMsg, true).catch((err) => {
         console.warn('[client_chat] notifyAdmins:', err)
+      })
+      void createLeadFromChat(thread, trimmedMsg).catch((err) => {
+        console.warn('[client_chat] lead:', err)
       })
     } catch (err) {
       console.error('[client_chat] startThread:', err)

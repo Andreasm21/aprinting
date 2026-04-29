@@ -7,6 +7,7 @@ import {
   notifyAdminsOfContact,
   notifyAdminsOfAlert,
 } from '@/lib/adminNotifier'
+import { createLeadFromContact, createLeadFromPartRequest } from '@/lib/leadCreator'
 
 export type NotificationType = 'order' | 'part_request' | 'contact' | 'admin_alert'
 
@@ -274,6 +275,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New part request received`, `${notification.details.partName} — ${notification.business.contactName}`)
       void notifyAdminsOfPartRequest(notification).catch((err) => console.warn('[notifications] email:', err))
+      void createLeadFromPartRequest(notification).catch((err) => console.warn('[notifications] lead:', err))
     },
 
     addContact: async (contact) => {
@@ -288,6 +290,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => {
       await sbUpsert(notification)
       useAuditLogStore.getState().log('create', 'notification', `New contact message`, `From ${notification.name}`)
       void notifyAdminsOfContact(notification).catch((err) => console.warn('[notifications] email:', err))
+      void createLeadFromContact(notification).catch((err) => console.warn('[notifications] lead:', err))
     },
 
     addAdminAlert: async (alert) => {
