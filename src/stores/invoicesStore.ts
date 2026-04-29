@@ -7,6 +7,7 @@ import { useActivitiesStore } from './activitiesStore'
 import { useAuditLogStore } from './auditLogStore'
 import { useOrdersStore } from './ordersStore'
 import { useInventoryStore } from './inventoryStore'
+import { useLeadsStore } from './leadsStore'
 
 export const CYPRUS_VAT_RATE = 0.19
 
@@ -78,6 +79,9 @@ interface InvoicesState {
   convertToInvoice: (quotationId: string) => string | null
   createFromOrder: (orderId: string) => string | null
   createQuotationFromPartRequest: (requestId: string) => string | null
+  /** Create a draft quotation pre-filled from a Lead row.
+   *  Returns the new invoice id, or null if the lead can't be found. */
+  createQuotationFromLead: (leadId: string) => string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -579,6 +583,58 @@ export const useInvoicesStore = create<InvoicesState>((set, get) => {
         termsAndConditions: `• This quotation is valid for 30 days from the date of issue.\n• Prices are in EUR and include Cyprus VAT at 19%.\n• Estimated weight is approximate; final pricing may vary ±15% based on actual print weight.\n• Payment is due upon completion unless otherwise agreed.\n• Standard delivery within Cyprus is included for orders over €50.\n• Revisions to the 3D model are limited to 2 rounds; additional revisions at €15/hr.\n• All intellectual property remains with the client.`,
         status: 'draft',
         sourcePartRequestId: requestId,
+      }
+
+      return get().addInvoice(data)
+    },
+
+    /** Pre-fill a draft quote from a Lead. Costs are zero — admin fills them
+     *  in the quote editor. Sets the lead's status to 'quoted' and links
+     *  document_id back so the lead's timeline records the quote handoff.
+     *
+     *  This action is intentionally non-async: the existing addInvoice flow
+     *  is fire-and-forget too, so we mirror its shape. The lead-side update
+     *  + status flip is wired by the calling UI (LeadDetailPanel) so this
+     *  store doesn't need to import leadsStore. */
+    createQuotationFromLead: (leadId) => {
+      const lead = useLeadsStore.getState().byId(leadId)
+      if (!lead) return null
+
+      const qty = lead.scopeQuantity && lead.scopeQuantity > 0 ? lead.scopeQuantity : 1
+      const description = lead.scopeDescription?.trim() || `Inquiry from ${lead.name}`
+      const lineItems: InvoiceLineItem[] = [
+        {
+          description,
+          material: lead.scopeMaterial || undefined,
+          unitPrice: 0,
+          quantity: qty,
+          total: 0,
+        },
+      ]
+
+      const validUntil = new Date()
+      validUntil.setDate(validUntil.getDate() + 30)
+
+      const data: Omit<Invoice, 'id' | 'createdAt'> = {
+        type: 'quotation',
+        documentNumber: get().getNextNumber('quotation'),
+        date: new Date().toISOString(),
+        validUntil: validUntil.toISOString(),
+        customerName: lead.name,
+        customerEmail: lead.email ?? '',
+        customerCompany: lead.company || undefined,
+        billingAddress: '',
+        lineItems,
+        subtotal: 0,
+        vatRate: CYPRUS_VAT_RATE,
+        vatAmount: 0,
+        deliveryFee: 0,
+        discountPercent: 0,
+        discountAmount: 0,
+        total: 0,
+        notes: lead.notes ? `From lead notes:\n${lead.notes}` : '',
+        termsAndConditions: `• This quotation is valid for 30 days from the date of issue.\n• Prices are in EUR and include Cyprus VAT at 19%.\n• Payment is due upon completion unless otherwise agreed.\n• Standard delivery within Cyprus is included for orders over €50.`,
+        status: 'draft',
       }
 
       return get().addInvoice(data)

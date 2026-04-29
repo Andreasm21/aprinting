@@ -51,6 +51,7 @@ const AdminStlViewer = lazy(() => import('@/admin/AdminStlViewer'))
 const AdminTasks = lazy(() => import('@/admin/AdminTasks'))
 const AdminFiles = lazy(() => import('@/admin/AdminFiles'))
 const AdminConversations = lazy(() => import('@/admin/AdminConversations'))
+const AdminLeads = lazy(() => import('@/admin/AdminLeads'))
 const ProductPage = lazy(() => import('@/pages/ProductPage'))
 
 // Portal (customer-facing)
@@ -151,6 +152,8 @@ function App() {
         <Route path="/admin/files" element={<AdminLoader><AdminFiles /></AdminLoader>} />
         {/* Customer chats from the public live-chat widget */}
         <Route path="/admin/conversations" element={<AdminLoader><AdminConversations /></AdminLoader>} />
+        {/* Leads pipeline */}
+        <Route path="/admin/leads" element={<AdminLoader><AdminLeads /></AdminLoader>} />
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />

@@ -48,6 +48,15 @@ export interface Lead {
   tags: string[]
   customerId?: string
   documentId?: string
+
+  // Rough scope — admin captures what the lead wants here so the eventual
+  // quotation auto-fills with sensible defaults. Costs are intentionally
+  // absent at lead time — admin enters those when creating the quote.
+  scopeDescription?: string
+  scopeQuantity?: number
+  scopeMaterial?: string
+  scopeUrgency?: string
+
   estimatedValueEur?: number
   nextFollowupAt?: string
   createdAt: string
@@ -83,6 +92,10 @@ interface LeadRow {
   tags: string[] | null
   customer_id: string | null
   document_id: string | null
+  scope_description: string | null
+  scope_quantity: number | string | null
+  scope_material: string | null
+  scope_urgency: string | null
   estimated_value_eur: number | string | null
   next_followup_at: string | null
   created_at: string
@@ -107,6 +120,15 @@ function leadFromRow(r: LeadRow): Lead {
     tags: Array.isArray(r.tags) ? r.tags : [],
     customerId: r.customer_id ?? undefined,
     documentId: r.document_id ?? undefined,
+    scopeDescription: r.scope_description ?? undefined,
+    scopeQuantity:
+      r.scope_quantity == null
+        ? undefined
+        : typeof r.scope_quantity === 'string'
+          ? parseInt(r.scope_quantity, 10) || undefined
+          : r.scope_quantity,
+    scopeMaterial: r.scope_material ?? undefined,
+    scopeUrgency: r.scope_urgency ?? undefined,
     estimatedValueEur:
       r.estimated_value_eur == null
         ? undefined
@@ -174,7 +196,7 @@ interface State {
   /** Manual creation from the admin UI. */
   create: (input: Omit<Lead, 'id' | 'createdAt' | 'lastActivityAt' | 'tags'> & { tags?: string[] }, byAdminId: string) => Promise<Lead | null>
 
-  update: (id: string, updates: Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'company' | 'notes' | 'tags' | 'estimatedValueEur' | 'nextFollowupAt' | 'assignedAdminId'>>, byAdminId?: string) => Promise<void>
+  update: (id: string, updates: Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'company' | 'notes' | 'tags' | 'estimatedValueEur' | 'nextFollowupAt' | 'assignedAdminId' | 'scopeDescription' | 'scopeQuantity' | 'scopeMaterial' | 'scopeUrgency' | 'documentId' | 'customerId'>>, byAdminId?: string) => Promise<void>
 
   setStatus: (id: string, status: LeadStatus, byAdminId: string, reason?: string) => Promise<void>
 
@@ -358,6 +380,10 @@ export const useLeadsStore = create<State>((set, get) => ({
           tags: input.tags ?? [],
           estimated_value_eur: input.estimatedValueEur ?? null,
           next_followup_at: input.nextFollowupAt ?? null,
+          scope_description: input.scopeDescription ?? null,
+          scope_quantity: input.scopeQuantity ?? null,
+          scope_material: input.scopeMaterial ?? null,
+          scope_urgency: input.scopeUrgency ?? null,
         })
         .select()
         .single()
@@ -387,6 +413,12 @@ export const useLeadsStore = create<State>((set, get) => ({
     if ('estimatedValueEur' in updates) row.estimated_value_eur = updates.estimatedValueEur ?? null
     if ('nextFollowupAt' in updates) row.next_followup_at = updates.nextFollowupAt ?? null
     if ('assignedAdminId' in updates) row.assigned_admin_id = updates.assignedAdminId ?? null
+    if ('scopeDescription' in updates) row.scope_description = updates.scopeDescription ?? null
+    if ('scopeQuantity' in updates) row.scope_quantity = updates.scopeQuantity ?? null
+    if ('scopeMaterial' in updates) row.scope_material = updates.scopeMaterial ?? null
+    if ('scopeUrgency' in updates) row.scope_urgency = updates.scopeUrgency ?? null
+    if ('documentId' in updates) row.document_id = updates.documentId ?? null
+    if ('customerId' in updates) row.customer_id = updates.customerId ?? null
 
     // Optimistic local merge
     set((s) => ({ leads: s.leads.map((l) => l.id === id ? { ...l, ...updates, lastActivityAt: new Date().toISOString() } : l) }))

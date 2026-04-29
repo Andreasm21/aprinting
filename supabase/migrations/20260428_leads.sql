@@ -27,7 +27,17 @@ create table if not exists leads (
 
   -- Conversion / quotation linkage
   customer_id          text references customers(id) on delete set null,
-  document_id          text references documents(id) on delete set null,
+  -- Soft pointer to the linked quotation/invoice. NOT a FK because the
+  -- invoicesStore writes the document row fire-and-forget (the id is
+  -- generated client-side and returned synchronously); the lead update
+  -- can race ahead of the document insert and a hard FK would error.
+  document_id          text,
+
+  -- Rough scope (drives the auto-prefill when creating a quotation)
+  scope_description    text,            -- "10 parts of label boxes"
+  scope_quantity       integer,
+  scope_material       text,            -- 'fdm-pla' | 'fdm-petg' | 'resin' | etc.
+  scope_urgency        text,            -- 'standard' | 'express' | 'rush'
 
   -- Lifecycle
   estimated_value_eur  numeric(10,2),
@@ -37,6 +47,12 @@ create table if not exists leads (
   closed_at            timestamptz,
   closed_reason        text
 );
+
+-- Idempotent column adds for projects that already ran the original migration
+alter table leads add column if not exists scope_description text;
+alter table leads add column if not exists scope_quantity    integer;
+alter table leads add column if not exists scope_material    text;
+alter table leads add column if not exists scope_urgency     text;
 
 create index if not exists idx_leads_status_activity
   on leads(status, last_activity_at desc);

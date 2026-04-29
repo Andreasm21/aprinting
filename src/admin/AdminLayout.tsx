@@ -11,6 +11,7 @@ import QuoteCart from './components/QuoteCart'
 import AdminChatBubble from './chat/AdminChatBubble'
 import { useAdminTasksStore } from '@/stores/adminTasksStore'
 import { useAdminClientChatStore } from '@/stores/adminClientChatStore'
+import { useLeadsStore } from '@/stores/leadsStore'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
@@ -23,7 +24,7 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   exact?: boolean
-  badge?: 'notifications' | 'my-tasks' | 'client-chats'
+  badge?: 'notifications' | 'my-tasks' | 'client-chats' | 'leads'
   match?: (pathname: string) => boolean
 }
 
@@ -45,6 +46,7 @@ const navGroups: NavGroup[] = [
       { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
       { path: '/admin/notifications', label: 'Requests', icon: Bell, badge: 'notifications' },
       { path: '/admin/conversations', label: 'Customer chats', icon: MessageSquare, badge: 'client-chats' },
+      { path: '/admin/leads', label: 'Leads', icon: Inbox, badge: 'leads' },
       { path: '/admin/customers', label: 'Customers', icon: Users },
     ],
   },
@@ -131,6 +133,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const messagesByThread = useAdminClientChatStore((s) => s.messagesByThread)
   const loadClientChats = useAdminClientChatStore((s) => s.load)
   const hasLoadedClientChats = useAdminClientChatStore((s) => s.hasLoaded)
+  const leads = useLeadsStore((s) => s.leads)
+  const loadLeads = useLeadsStore((s) => s.load)
+  const hasLoadedLeads = useLeadsStore((s) => s.hasLoaded)
   const currentUser = useAdminAuthStore((s) => s.currentUser)
   const loading = useAdminAuthStore((s) => s.loading)
   const bootstrap = useAdminAuthStore((s) => s.bootstrap)
@@ -172,6 +177,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (currentUser && !hasLoadedClientChats) void loadClientChats()
   }, [currentUser, hasLoadedClientChats, loadClientChats])
+  useEffect(() => {
+    if (currentUser && !hasLoadedLeads) void loadLeads()
+  }, [currentUser, hasLoadedLeads, loadLeads])
 
   const myOpenTasks = currentUser
     ? tasks.filter((t) => t.assignedTo === currentUser.id && t.status !== 'done').length
@@ -188,6 +196,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     return total
   }, [clientChats, messagesByThread])
+
+  // Open leads (potential or working) — what needs attention
+  const leadsBadge = useMemo(() => {
+    return leads.filter((l) => l.status === 'potential' || l.status === 'working').length
+  }, [leads])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -424,7 +437,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const groupUnreadCount =
               (group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0) +
               (group.items.some((item) => item.badge === 'my-tasks') ? myOpenTasks : 0) +
-              (group.items.some((item) => item.badge === 'client-chats') ? clientChatsUnread : 0)
+              (group.items.some((item) => item.badge === 'client-chats') ? clientChatsUnread : 0) +
+              (group.items.some((item) => item.badge === 'leads') ? leadsBadge : 0)
             const GroupIcon = group.icon
             return (
               <div key={group.id}>
@@ -479,6 +493,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           {item.badge === 'client-chats' && clientChatsUnread > 0 && (
                             <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                               {clientChatsUnread}
+                            </span>
+                          )}
+                          {item.badge === 'leads' && leadsBadge > 0 && (
+                            <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                              {leadsBadge}
                             </span>
                           )}
                         </Link>
