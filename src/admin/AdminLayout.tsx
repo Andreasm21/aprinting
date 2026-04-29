@@ -12,6 +12,7 @@ import AdminChatBubble from './chat/AdminChatBubble'
 import { useAdminTasksStore } from '@/stores/adminTasksStore'
 import { useAdminClientChatStore } from '@/stores/adminClientChatStore'
 import { useLeadsStore } from '@/stores/leadsStore'
+import { useEmailsStore } from '@/stores/emailsStore'
 import { useContentStore } from '@/stores/contentStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
@@ -24,7 +25,7 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   exact?: boolean
-  badge?: 'notifications' | 'my-tasks' | 'client-chats' | 'leads'
+  badge?: 'notifications' | 'my-tasks' | 'client-chats' | 'leads' | 'mail'
   match?: (pathname: string) => boolean
 }
 
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
       { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
       { path: '/admin/notifications', label: 'Requests', icon: Bell, badge: 'notifications' },
       { path: '/admin/conversations', label: 'Customer chats', icon: MessageSquare, badge: 'client-chats' },
+      { path: '/admin/mail', label: 'Mail', icon: Mail, badge: 'mail' },
       { path: '/admin/leads', label: 'Leads', icon: Inbox, badge: 'leads' },
       { path: '/admin/customers', label: 'Customers', icon: Users },
     ],
@@ -136,6 +138,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const leads = useLeadsStore((s) => s.leads)
   const loadLeads = useLeadsStore((s) => s.load)
   const hasLoadedLeads = useLeadsStore((s) => s.hasLoaded)
+  const emailThreads = useEmailsStore((s) => s.threads)
+  const loadEmails = useEmailsStore((s) => s.load)
+  const hasLoadedEmails = useEmailsStore((s) => s.hasLoaded)
   const currentUser = useAdminAuthStore((s) => s.currentUser)
   const loading = useAdminAuthStore((s) => s.loading)
   const bootstrap = useAdminAuthStore((s) => s.bootstrap)
@@ -180,6 +185,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (currentUser && !hasLoadedLeads) void loadLeads()
   }, [currentUser, hasLoadedLeads, loadLeads])
+  useEffect(() => {
+    if (currentUser && !hasLoadedEmails) void loadEmails()
+  }, [currentUser, hasLoadedEmails, loadEmails])
 
   const myOpenTasks = currentUser
     ? tasks.filter((t) => t.assignedTo === currentUser.id && t.status !== 'done').length
@@ -201,6 +209,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const leadsBadge = useMemo(() => {
     return leads.filter((l) => l.status === 'potential' || l.status === 'working').length
   }, [leads])
+
+  // Mail unread (sum of unread_count across non-archived threads)
+  const mailBadge = useMemo(() => {
+    return emailThreads.reduce((sum, t) => sum + (t.archived ? 0 : t.unreadCount), 0)
+  }, [emailThreads])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -438,7 +451,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               (group.items.some((item) => item.badge === 'notifications') ? unreadCount : 0) +
               (group.items.some((item) => item.badge === 'my-tasks') ? myOpenTasks : 0) +
               (group.items.some((item) => item.badge === 'client-chats') ? clientChatsUnread : 0) +
-              (group.items.some((item) => item.badge === 'leads') ? leadsBadge : 0)
+              (group.items.some((item) => item.badge === 'leads') ? leadsBadge : 0) +
+              (group.items.some((item) => item.badge === 'mail') ? mailBadge : 0)
             const GroupIcon = group.icon
             return (
               <div key={group.id}>
@@ -498,6 +512,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           {item.badge === 'leads' && leadsBadge > 0 && (
                             <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                               {leadsBadge}
+                            </span>
+                          )}
+                          {item.badge === 'mail' && mailBadge > 0 && (
+                            <span className="bg-accent-amber text-bg-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                              {mailBadge}
                             </span>
                           )}
                         </Link>

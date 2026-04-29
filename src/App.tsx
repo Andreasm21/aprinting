@@ -52,6 +52,7 @@ const AdminTasks = lazy(() => import('@/admin/AdminTasks'))
 const AdminFiles = lazy(() => import('@/admin/AdminFiles'))
 const AdminConversations = lazy(() => import('@/admin/AdminConversations'))
 const AdminLeads = lazy(() => import('@/admin/AdminLeads'))
+const AdminMail = lazy(() => import('@/admin/AdminMail'))
 const ProductPage = lazy(() => import('@/pages/ProductPage'))
 
 // Portal (customer-facing)
@@ -154,6 +155,8 @@ function App() {
         <Route path="/admin/conversations" element={<AdminLoader><AdminConversations /></AdminLoader>} />
         {/* Leads pipeline */}
         <Route path="/admin/leads" element={<AdminLoader><AdminLeads /></AdminLoader>} />
+        {/* Mail client (shared team inbox) */}
+        <Route path="/admin/mail" element={<AdminLoader><AdminMail /></AdminLoader>} />
         {/* Orders — overview + the existing Quotations / Invoices as subsections */}
         <Route path="/admin/orders" element={<AdminLoader><AdminOrdersOverview /></AdminLoader>} />
         <Route path="/admin/orders/quotations" element={<AdminLoader><AdminQuotations /></AdminLoader>} />
