@@ -172,7 +172,11 @@ export default function AdminTeam() {
           initial={editing}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
-            await updateAdmin(editing.id, { displayName: data.displayName, email: data.email })
+            await updateAdmin(editing.id, {
+              displayName: data.displayName,
+              email: data.email,
+              emailSignatureHtml: data.emailSignatureHtml,
+            })
             if (data.password) await changePassword(editing.id, data.password)
             setEditing(null)
             return { success: true }

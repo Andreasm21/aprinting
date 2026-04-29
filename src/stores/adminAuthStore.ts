@@ -13,6 +13,8 @@ export interface AdminUser {
   email?: string
   passwordHash: string
   mustChangePassword?: boolean
+  /** Rich-text signature appended to outbound replies in the mail client. */
+  emailSignatureHtml?: string
   createdAt: string
   lastLoginAt?: string
 }
@@ -34,7 +36,7 @@ interface AdminAuthState {
   logout: () => void
   restoreSession: () => Promise<void>
   addAdmin: (data: { username: string; displayName: string; email?: string; password?: string }) => Promise<{ success: boolean; error?: string; generatedPassword?: string }>
-  updateAdmin: (id: string, updates: { displayName?: string; email?: string }) => Promise<void>
+  updateAdmin: (id: string, updates: { displayName?: string; email?: string; emailSignatureHtml?: string }) => Promise<void>
   changePassword: (id: string, newPassword: string, clearMustChange?: boolean) => Promise<void>
   resetPassword: (id: string) => Promise<{ success: boolean; password?: string }>
   deleteAdmin: (id: string) => { success: boolean; error?: string }
@@ -49,6 +51,7 @@ interface SbRow {
   email: string | null
   password_hash: string
   must_change_password: boolean | null
+  email_signature_html: string | null
   created_at: string
   last_login_at: string | null
 }
@@ -61,6 +64,7 @@ function toRow(u: AdminUser): SbRow {
     email: u.email ?? null,
     password_hash: u.passwordHash,
     must_change_password: u.mustChangePassword ?? false,
+    email_signature_html: u.emailSignatureHtml ?? null,
     created_at: u.createdAt,
     last_login_at: u.lastLoginAt ?? null,
   }
@@ -74,6 +78,7 @@ function fromRow(r: SbRow): AdminUser {
     email: r.email ?? undefined,
     passwordHash: r.password_hash,
     mustChangePassword: r.must_change_password ?? false,
+    emailSignatureHtml: r.email_signature_html ?? undefined,
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at ?? undefined,
   }
@@ -225,7 +230,10 @@ export const useAdminAuthStore = create<AdminAuthState>((set, get) => ({
         updated = {
           ...u,
           displayName: updates.displayName?.trim() ?? u.displayName,
-          email: updates.email?.trim() || undefined,
+          email: 'email' in updates ? (updates.email?.trim() || undefined) : u.email,
+          emailSignatureHtml: 'emailSignatureHtml' in updates
+            ? (updates.emailSignatureHtml || undefined)
+            : u.emailSignatureHtml,
         }
         return updated
       })

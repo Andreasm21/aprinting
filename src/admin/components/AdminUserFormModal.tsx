@@ -7,6 +7,7 @@ interface FormData {
   displayName: string
   email: string
   password: string
+  emailSignatureHtml: string
 }
 
 export default function AdminUserFormModal({
@@ -26,6 +27,7 @@ export default function AdminUserFormModal({
     displayName: initial?.displayName || '',
     email: initial?.email || '',
     password: '',
+    emailSignatureHtml: initial?.emailSignatureHtml || '',
   })
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
@@ -195,6 +197,26 @@ export default function AdminUserFormModal({
               <Shield size={14} className="text-accent-amber shrink-0 mt-0.5" />
               <p className="text-text-secondary text-xs">
                 A secure temporary password will be auto-generated. The team member will be required to change it on first login.
+              </p>
+            </div>
+          )}
+
+          {/* Email signature — only on edit (no point setting it before account creation) */}
+          {isEdit && (
+            <div>
+              <label className="block font-mono text-xs text-text-muted uppercase mb-1">
+                Mail-client signature (optional)
+              </label>
+              <textarea
+                value={form.emailSignatureHtml}
+                onChange={(e) => setForm({ ...form, emailSignatureHtml: e.target.value })}
+                rows={5}
+                className="input-field text-xs font-mono leading-relaxed resize-y"
+                placeholder={`— Andreas\nAxiom · Cyprus\n+357 99 …\nhttps://axiomcreate.com`}
+              />
+              <p className="text-text-muted text-[10px] mt-1 leading-relaxed">
+                Appended to outbound replies sent from <span className="text-accent-amber">/admin/mail</span>.
+                Plain text is fine; basic HTML is allowed (e.g. <code>&lt;a href=…&gt;</code>, <code>&lt;br&gt;</code>).
               </p>
             </div>
           )}
