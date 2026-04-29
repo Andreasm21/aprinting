@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Mail, Archive, ArchiveRestore, ChevronDown, ChevronUp, Paperclip, Download } from 'lucide-react'
 import { useAdminAuthStore } from '@/stores/adminAuthStore'
 import { useEmailsStore, type EmailMessage } from '@/stores/emailsStore'
+import Composer from './Composer'
 
 const EMPTY_MESSAGES: EmailMessage[] = []
 
@@ -104,12 +105,8 @@ export default function ThreadView({ threadId }: Props) {
         )}
       </div>
 
-      {/* Reply composer placeholder */}
-      <div className="border-t border-border bg-bg-tertiary/30 p-3 text-center">
-        <p className="text-text-muted text-[11px] font-mono italic">
-          Composer ships in Phase 3 (rich-text editor + signature + threading headers + attachments).
-        </p>
-      </div>
+      {/* Reply composer */}
+      <Composer threadId={thread.id} />
     </div>
   )
 }

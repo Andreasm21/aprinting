@@ -177,6 +177,20 @@ interface State {
   /** Mark a thread's unread_count to zero and stamp read_at on its inbound messages. */
   markThreadRead: (threadId: string) => Promise<void>
 
+  /** Send an outbound reply to a thread. Computes In-Reply-To/References
+   *  from the latest inbound message, appends the admin's signature, posts
+   *  to /api/send-email, and inserts the outbound row optimistically. */
+  sendReply: (input: {
+    threadId: string
+    bodyHtml: string
+    bodyText?: string
+    attachments?: Array<{ filename: string; contentBase64: string; contentType?: string }>
+    sentByAdminId: string
+    fromName?: string
+    /** Optional override of the from-address. Falls back to env's EMAIL_FROM on the server. */
+    fromEmail?: string
+  }) => Promise<{ ok: boolean; error?: string }>
+
   /** Toggle archive on a thread. */
   setArchived: (threadId: string, archived: boolean) => Promise<void>
 
@@ -313,6 +327,156 @@ export const useEmailsStore = create<State>((set, get) => ({
     } catch (err) {
       console.warn('[emails] markThreadRead:', err)
     }
+  },
+
+  sendReply: async (input) => {
+    if (!isSupabaseConfigured) return { ok: false, error: 'Supabase not configured' }
+    const thread = get().byId(input.threadId)
+    if (!thread) return { ok: false, error: 'Thread not found' }
+
+    // Find the most recent message in this thread to build threading headers.
+    const msgs = get().messagesByThread.get(input.threadId) ?? EMPTY_MESSAGES
+    const lastMessage = msgs[msgs.length - 1]
+    const lastInbound = [...msgs].reverse().find((m) => m.direction === 'inbound')
+
+    // Reply target = the most recent message in the thread (could be our own
+    // previous reply if we sent the last one). Prefer the last inbound for
+    // building the chain because that's what the customer's mail client
+    // will use as the parent.
+    const parent = lastInbound ?? lastMessage
+
+    // Build the reference chain — root → ... → parent
+    const refs: string[] = []
+    if (parent?.referenceChain && parent.referenceChain.length > 0) {
+      refs.push(...parent.referenceChain)
+    }
+    if (parent?.messageId && !refs.includes(parent.messageId)) {
+      refs.push(parent.messageId)
+    }
+
+    // Generate our outgoing Message-ID so we can store it locally and
+    // recognise the customer's reply when it arrives back via webhook.
+    const newMessageId = `<reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@axiomcreate.com>`
+
+    // Subject: Re: prefix if not already there
+    const baseSubject = thread.subject.replace(/^(re|fw|fwd):\s*/gi, '').trim() || '(no subject)'
+    const subject = baseSubject.toLowerCase().startsWith('re:') ? baseSubject : `Re: ${baseSubject}`
+
+    // Optimistic insert
+    const optimistic: EmailMessage = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      threadId: input.threadId,
+      direction: 'outbound',
+      messageId: newMessageId,
+      inReplyTo: parent?.messageId,
+      referenceChain: refs,
+      fromEmail: input.fromEmail ?? '',
+      fromName: input.fromName,
+      toEmails: [thread.participantEmail],
+      ccEmails: [],
+      bccEmails: [],
+      subject,
+      bodyText: input.bodyText,
+      bodyHtml: input.bodyHtml,
+      sentByAdminId: input.sentByAdminId,
+      createdAt: new Date().toISOString(),
+    }
+    set((s) => {
+      const next = new Map(s.messagesByThread)
+      next.set(input.threadId, [...(next.get(input.threadId) ?? []), optimistic])
+      return { messagesByThread: next }
+    })
+
+    // POST to /api/send-email
+    let sendError: string | null = null
+    try {
+      const r = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: thread.participantEmail,
+          subject,
+          html: input.bodyHtml,
+          text: input.bodyText,
+          inReplyTo: parent?.messageId,
+          references: refs,
+          messageId: newMessageId,
+          // Send as the team's inbound address so customers reply back to it
+          // → those replies fire the webhook and land in /admin/mail too.
+          replyTo: input.fromEmail,
+          attachments: input.attachments?.map((a) => ({
+            filename: a.filename,
+            content: a.contentBase64,
+            contentType: a.contentType,
+          })),
+        }),
+      })
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '')
+        sendError = `send-email ${r.status}: ${txt.slice(0, 200)}`
+      }
+    } catch (err) {
+      sendError = err instanceof Error ? err.message : 'send-email failed'
+    }
+
+    if (sendError) {
+      // Roll back the optimistic insert
+      set((s) => {
+        const next = new Map(s.messagesByThread)
+        const list = (next.get(input.threadId) ?? []).filter((m) => m.id !== optimistic.id)
+        next.set(input.threadId, list)
+        return { messagesByThread: next }
+      })
+      return { ok: false, error: sendError }
+    }
+
+    // Persist to DB so it survives page refresh + so the customer's reply
+    // can be threaded against it via In-Reply-To matching.
+    try {
+      const { data, error } = await supabase.from('email_messages')
+        .insert({
+          thread_id: input.threadId,
+          direction: 'outbound',
+          message_id: newMessageId,
+          in_reply_to: parent?.messageId ?? null,
+          reference_chain: refs,
+          from_email: input.fromEmail ?? '',
+          from_name: input.fromName ?? null,
+          to_emails: [thread.participantEmail],
+          cc_emails: [],
+          bcc_emails: [],
+          subject,
+          body_text: input.bodyText ?? null,
+          body_html: input.bodyHtml,
+          sent_by_admin_id: input.sentByAdminId,
+        })
+        .select()
+        .single()
+      if (error || !data) {
+        console.warn('[emails] sendReply persist:', error?.message)
+      } else {
+        // Swap the optimistic row for the real one
+        const real = messageFromRow(data as MessageRow)
+        set((s) => {
+          const next = new Map(s.messagesByThread)
+          const list = (next.get(input.threadId) ?? []).map((m) => m.id === optimistic.id ? real : m)
+          next.set(input.threadId, list)
+          return { messagesByThread: next }
+        })
+      }
+
+      // Bump thread last_message_at + count
+      await supabase.from('email_threads')
+        .update({
+          message_count: (thread.messageCount ?? 0) + 1,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq('id', input.threadId)
+    } catch (err) {
+      console.warn('[emails] sendReply persist:', err)
+    }
+
+    return { ok: true }
   },
 
   setArchived: async (threadId, archived) => {

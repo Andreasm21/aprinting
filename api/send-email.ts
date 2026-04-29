@@ -21,6 +21,23 @@ interface SendEmailBody {
   subject: string
   html: string
   text?: string
+  // Override the default `from` address (e.g. for shared inbox replies).
+  // Falls back to the EMAIL_FROM env var if absent.
+  from?: string
+  // Tells the recipient where to direct their reply. For shared-inbox
+  // replies this should usually be the inbound address (e.g. team@…)
+  // so customer replies land back in /admin/mail rather than going to
+  // a no-reply.
+  replyTo?: string | string[]
+  // Threading — set on replies so Gmail/Outlook group them with the
+  // original thread. Caller is responsible for picking the right values:
+  //   inReplyTo  → the Message-ID of the parent message we're replying to
+  //   references → the full chain (root → ... → parent), oldest first
+  //   messageId  → the Message-ID we want for THIS new message
+  //                (otherwise Resend generates one)
+  inReplyTo?: string
+  references?: string[]
+  messageId?: string
   // Each attachment: { filename, content (base64), contentType }
   attachments?: Array<{
     filename: string
@@ -80,15 +97,27 @@ export default async function handler(
 
   const resend = new Resend(apiKey)
 
+  // Build optional MIME headers — Resend accepts a `headers` object that
+  // gets injected into the outgoing message. Threading + reply-to handled
+  // here.
+  const headers: Record<string, string> = {}
+  if (body.inReplyTo) headers['In-Reply-To'] = body.inReplyTo
+  if (body.references && body.references.length > 0) {
+    headers['References'] = body.references.join(' ')
+  }
+  if (body.messageId) headers['Message-ID'] = body.messageId
+
   try {
     const result = await resend.emails.send({
-      from,
+      from: body.from ?? from,
       to: body.to,
       cc: body.cc,
       bcc: body.bcc,
+      replyTo: body.replyTo,
       subject: body.subject,
       html: body.html,
       text: body.text,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       attachments: body.attachments?.map((a) => ({
         filename: a.filename,
         content: Buffer.from(a.content, 'base64'),
