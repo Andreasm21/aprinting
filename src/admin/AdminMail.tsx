@@ -11,7 +11,6 @@
 import { useEffect } from 'react'
 import { Mail } from 'lucide-react'
 import { useEmailsStore } from '@/stores/emailsStore'
-import { useCustomersStore } from '@/stores/customersStore'
 import { useLeadsStore } from '@/stores/leadsStore'
 import ThreadList from './mail/ThreadList'
 import ThreadView from './mail/ThreadView'
@@ -25,10 +24,9 @@ export default function AdminMail() {
   const setActiveThread = useEmailsStore((s) => s.setActiveThread)
   const threads = useEmailsStore((s) => s.threads)
 
-  // Side stores feed ContextRail; they may already be loaded but ensure it.
-  const loadCustomers = useCustomersStore((s) => s.fetchCustomers)
+  // Leads feed ContextRail. customersStore auto-loads on module import,
+  // so nothing to trigger there.
   const loadLeads = useLeadsStore((s) => s.load)
-  useEffect(() => { void loadCustomers?.() }, [loadCustomers])
   useEffect(() => { void loadLeads?.() }, [loadLeads])
 
   useEffect(() => { if (!hasLoaded) void load() }, [hasLoaded, load])
