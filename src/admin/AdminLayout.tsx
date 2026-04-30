@@ -47,7 +47,10 @@ const navGroups: NavGroup[] = [
       { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
       { path: '/admin/notifications', label: 'Requests', icon: Bell, badge: 'notifications' },
       { path: '/admin/conversations', label: 'Customer chats', icon: MessageSquare, badge: 'client-chats' },
-      { path: '/admin/mail', label: 'Mail', icon: Mail, badge: 'mail' },
+      // Mail nav item shelved — page + route + stores remain in repo for the
+      // moment since inbound webhook isn't fully wired in production yet.
+      // Re-add when Resend Inbound delivers a real email and the loop closes.
+      // { path: '/admin/mail', label: 'Mail', icon: Mail, badge: 'mail' },
       { path: '/admin/leads', label: 'Leads', icon: Inbox, badge: 'leads' },
       { path: '/admin/customers', label: 'Customers', icon: Users },
     ],
